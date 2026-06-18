@@ -1,0 +1,1743 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>도보마포</title>
+
+  <!-- Pretendard -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.css" />
+
+  <!-- Leaflet.js -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Turf.js/6.5.0/turf.min.js"></script>
+
+  <style>
+    /* ─── Reset & Base ─────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --brand:       #9B1C20;
+      --brand-dark:  #7a1419;
+      --brand-light: #faeaeb;
+      --brand-mid:   #c94a50;
+      --text:        #1a1a1a;
+      --text-sub:    #555;
+      --border:      #e0e0e0;
+      --white:       #ffffff;
+      --bg:          #fafafa;
+      --radius:      10px;
+    }
+    html, body { height: 100%; font-family: 'Pretendard Variable', Pretendard, 'Apple SD Gothic Neo', sans-serif; background: var(--bg); color: var(--text); }
+
+    /* ─── Header ────────────────────────────────────────────────── */
+    header {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+      background: var(--white);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 20px;
+      height: 56px;
+    }
+    .logo {
+      display: flex; align-items: center; gap: 8px;
+      text-decoration: none;
+    }
+    .logo-mark {
+      width: 32px; height: 32px; border-radius: 8px;
+      background: var(--brand);
+      display: flex; align-items: center; justify-content: center;
+      color: var(--white); font-weight: 800; font-size: 13px; letter-spacing: -0.5px;
+    }
+    .logo-text {
+      font-size: 17px; font-weight: 800; color: var(--brand); letter-spacing: -0.5px;
+    }
+
+    /* ─── Tab Nav ───────────────────────────────────────────────── */
+    nav.tab-nav {
+      display: flex; gap: 0;
+    }
+    nav.tab-nav button {
+      background: none; border: none; cursor: pointer;
+      padding: 0 18px; height: 56px;
+      font-size: 14px; font-weight: 600; color: var(--text-sub);
+      border-bottom: 3px solid transparent;
+      transition: color .2s, border-color .2s;
+    }
+    nav.tab-nav button.active {
+      color: var(--brand);
+      border-bottom-color: var(--brand);
+    }
+    nav.tab-nav button:hover { color: var(--brand); }
+
+    /* ─── Main Layout ───────────────────────────────────────────── */
+    main { margin-top: 56px; height: calc(100vh - 56px); overflow: hidden; }
+    .tab-panel { display: none; height: 100%; }
+    .tab-panel.active { display: flex; flex-direction: column; }
+
+    /* ══════════════════════════════════════════════════════════════
+       TAB 1 — MAP
+    ══════════════════════════════════════════════════════════════ */
+    #tab-map { flex-direction: column; }
+
+    /* 본문: 사이드바(결과) + 지도 */
+    .map-body { flex: 1; display: flex; min-height: 0; }
+    .map-stage { position: relative; flex: 1; display: flex; flex-direction: column; min-width: 0; }
+
+    /* 지도 오버레이 안의 검색창 (지도 위에 떠 있음) */
+    #map-overlay .search-wrap { max-width: 320px; width: 100%; pointer-events: all; }
+    #map-overlay .search-wrap input {
+      background: var(--white);
+      box-shadow: 0 2px 8px rgba(0,0,0,.14);
+    }
+
+    /* ── Sidebar (desktop) ────────────────────────────────────── */
+    .map-sidebar {
+      width: 300px; flex-shrink: 0;
+      background: var(--white);
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      overflow: hidden;
+    }
+    .sidebar-controls {
+      padding: 12px;
+      border-bottom: 1px solid var(--border);
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .search-wrap { position: relative; }
+    .search-wrap input {
+      width: 100%;
+      padding: 9px 36px 9px 12px;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius);
+      font-size: 14px; outline: none;
+      transition: border-color .2s;
+      background: var(--bg);
+    }
+    .search-wrap input:focus { border-color: var(--brand); background: var(--white); }
+    .search-wrap .search-icon {
+      position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+      color: var(--text-sub); pointer-events: none; font-size: 15px;
+    }
+    .search-clear {
+      display: none; position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+      background: #ccc; border: none; border-radius: 50%;
+      width: 18px; height: 18px; cursor: pointer;
+      font-size: 11px; font-weight: 700; color: #fff; line-height: 1;
+      align-items: center; justify-content: center;
+    }
+    .search-clear.visible { display: flex; }
+    .search-clear:hover { background: #aaa; }
+
+    /* ── 검색 추천 드롭다운 ───────────────────────────────────── */
+    .search-suggestions {
+      display: none; position: absolute;
+      top: calc(100% + 5px); left: 0; right: 0; z-index: 700;
+      background: var(--white); border: 1.5px solid var(--border);
+      border-radius: var(--radius); box-shadow: 0 8px 24px rgba(0,0,0,.12);
+      overflow: hidden;
+    }
+    .search-suggestions.open { display: block; }
+    .suggest-header {
+      padding: 8px 12px 5px;
+      font-size: 10px; font-weight: 700; color: var(--text-sub);
+      letter-spacing: 0.6px; text-transform: uppercase;
+      border-bottom: 1px solid var(--border);
+    }
+    .suggest-item {
+      padding: 9px 12px; cursor: pointer;
+      display: flex; align-items: center; gap: 8px;
+      transition: background .1s;
+    }
+    .suggest-item:hover, .suggest-item.focused { background: var(--brand-light); }
+    .suggest-item .sug-info { flex: 1; min-width: 0; }
+    .suggest-item .sug-name {
+      font-size: 13px; font-weight: 600;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .suggest-item .sug-meta {
+      display: flex; align-items: center; gap: 5px; margin-top: 2px;
+    }
+    .suggest-item .sug-station { font-size: 11px; color: var(--text-sub); }
+    .suggest-empty { padding: 14px 12px; font-size: 13px; color: var(--text-sub); text-align: center; }
+
+
+    /* ── Result list ──────────────────────────────────────────── */
+    .result-list { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 10px; }
+    .result-count {
+      font-size: 11px; color: var(--text-sub); margin-bottom: 8px; padding: 0 4px;
+      letter-spacing: 0.03em;
+    }
+    .result-item {
+      padding: 7px 10px; border-radius: 8px;
+      border: 1.5px solid var(--border);
+      margin-bottom: 5px; cursor: pointer;
+      transition: border-color .12s, box-shadow .12s;
+    }
+    .result-item:hover { border-color: var(--brand); box-shadow: 0 2px 8px rgba(155,44,95,.1); }
+    .result-item.selected {
+      border-color: var(--brand);
+      box-shadow: 0 2px 8px rgba(155,44,95,.12);
+    }
+    .result-item .ri-top {
+      display: flex; align-items: baseline; gap: 6px;
+    }
+    .result-item .item-title {
+      font-size: 12.5px; font-weight: 700; line-height: 1.3;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      flex: 1; min-width: 0;
+    }
+    .result-item .ri-cat {
+      font-size: 9.5px; font-weight: 700; color: var(--brand-mid);
+      flex-shrink: 0; letter-spacing: .02em;
+    }
+    .result-item .ri-sub {
+      font-size: 10.5px; color: var(--text-sub); margin-top: 2px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+
+    /* ── Map overlays ─────────────────────────────────────────── */
+    #map-overlay {
+      position: absolute; top: 12px; left: 12px; right: 12px;
+      z-index: 500;
+      display: flex; flex-direction: column; gap: 6px;
+      pointer-events: none;
+    }
+    #zone-overlay, #cat-overlay {
+      display: flex; gap: 6px;
+      flex-wrap: nowrap; overflow-x: auto;
+      scrollbar-width: none;
+    }
+    #zone-overlay::-webkit-scrollbar,
+    #cat-overlay::-webkit-scrollbar { display: none; }
+    .cat-pill {
+      pointer-events: all;
+      flex-shrink: 0;
+      padding: 6px 13px; border-radius: 20px;
+      border: 1.5px solid var(--border);
+      background: var(--white);
+      font-size: 12.5px; font-weight: 600; font-family: inherit;
+      color: var(--text-sub); cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0,0,0,.12);
+      transition: background .15s, color .15s, border-color .15s;
+      white-space: nowrap;
+    }
+    .cat-pill svg { vertical-align: -2px; margin-right: 5px; }
+    .cat-pill.active svg { stroke: #fff !important; }
+    .cat-pill:hover { border-color: var(--brand); color: var(--brand); }
+    .cat-pill.active {
+      background: var(--brand); border-color: var(--brand);
+      color: var(--white); box-shadow: 0 2px 10px rgba(155,28,32,.3);
+    }
+
+    /* Map area */
+    #map { flex: 1; }
+
+    /* 고립 마커 이름 라벨 — 박스 없이 글자만, 점 아래 */
+    .mk-label.leaflet-tooltip {
+      background: transparent; border: none; box-shadow: none;
+      padding: 1px 4px; margin: 0;
+      font-size: 11px; font-weight: 700; color: #222;
+      white-space: nowrap; cursor: pointer;
+      text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 1px 2px rgba(255,255,255,.9);
+    }
+    .mk-label.leaflet-tooltip::before { display: none; }  /* 말풍선 꼬리 제거 */
+    /* 보이지 않는 넓은 클릭 영역은 내부 span 기준 (tooltip의 absolute 위치는 건드리지 않음) */
+    .mk-label .mkl { position: relative; }
+    .mk-label .mkl::after { content: ''; position: absolute; inset: -8px -12px; }
+
+    /* Leaflet popup override */
+    .leaflet-popup-content-wrapper {
+      border-radius: var(--radius) !important;
+      box-shadow: 0 4px 20px rgba(0,0,0,.15) !important;
+      border-top: 3px solid var(--brand);
+    }
+    .popup-cat { font-size: 11px; font-weight: 700; color: var(--brand-mid); margin-bottom: 4px; }
+    .popup-title { font-size: 15px; font-weight: 800; margin-bottom: 4px; }
+    .popup-dong { font-size: 12px; color: var(--text-sub); margin-bottom: 6px; }
+    .popup-desc { font-size: 13px; color: var(--text-sub); line-height: 1.5; margin-bottom: 10px; }
+    .popup-insta {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 7px 14px; background: var(--brand); color: #fff !important;
+      border-radius: 20px; font-size: 13px; font-weight: 700;
+      text-decoration: none !important; transition: background .15s;
+    }
+    .popup-insta:hover { background: var(--brand-dark); color: #fff !important; }
+
+    /* ══════════════════════════════════════════════════════════════
+       TAB 2 — CONTENTS
+    ══════════════════════════════════════════════════════════════ */
+    #tab-contents {
+      overflow-y: auto;
+      flex-direction: column;
+    }
+    .contents-header {
+      background: var(--white);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      display: flex; gap: 0;
+      position: sticky; top: 0; z-index: 10;
+    }
+    .contents-header button {
+      background: none; border: none; cursor: pointer;
+      padding: 16px 20px; font-size: 14px; font-weight: 600;
+      color: var(--text-sub);
+      border-bottom: 3px solid transparent;
+      transition: all .2s;
+    }
+    .contents-header button.active { color: var(--brand); border-bottom-color: var(--brand); }
+    .contents-header button:hover { color: var(--brand); }
+
+    .content-section { display: none; padding: 28px 24px; max-width: 900px; margin: 0 auto; width: 100%; }
+    .content-section.active { display: block; }
+
+    .section-title {
+      font-size: 22px; font-weight: 800; margin-bottom: 6px; color: var(--text);
+    }
+    .section-sub {
+      font-size: 14px; color: var(--text-sub); margin-bottom: 24px;
+    }
+
+    /* Card grid */
+    .card-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 20px;
+    }
+    .card {
+      background: var(--white); border-radius: 12px;
+      border: 1.5px solid var(--border);
+      overflow: hidden;
+      transition: box-shadow .2s, transform .2s;
+      cursor: pointer;
+    }
+    .card:hover { box-shadow: 0 6px 24px rgba(155,44,95,.12); transform: translateY(-2px); }
+    .card-img {
+      height: 160px; background: linear-gradient(135deg, var(--brand-light), #f0d4e4);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 32px; color: var(--brand);
+      position: relative; overflow: hidden;
+    }
+    .card-img .badge {
+      position: absolute; top: 10px; left: 10px;
+      background: var(--brand); color: var(--white);
+      font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 20px;
+    }
+    .card-body { padding: 16px; }
+    .card-date { font-size: 11px; color: var(--text-sub); margin-bottom: 5px; }
+    .card-title { font-size: 15px; font-weight: 700; margin-bottom: 6px; line-height: 1.4; }
+    .card-desc { font-size: 13px; color: var(--text-sub); line-height: 1.5; }
+
+    /* Notice list */
+    .notice-list { display: flex; flex-direction: column; gap: 0; }
+    .notice-item {
+      display: flex; align-items: flex-start; gap: 16px;
+      padding: 18px 0; border-bottom: 1px solid var(--border);
+      cursor: pointer; transition: background .1s;
+    }
+    .notice-item:hover { background: var(--brand-light); margin: 0 -8px; padding: 18px 8px; border-radius: 8px; }
+    .notice-badge {
+      flex-shrink: 0; padding: 3px 9px; border-radius: 20px;
+      font-size: 11px; font-weight: 700;
+    }
+    .notice-badge.new { background: var(--brand); color: var(--white); }
+    .notice-badge.normal { background: #eee; color: var(--text-sub); }
+    .notice-text .notice-title { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+    .notice-text .notice-date { font-size: 12px; color: var(--text-sub); }
+
+    /* ══════════════════════════════════════════════════════════════
+       TAB 3 — 소개
+    ══════════════════════════════════════════════════════════════ */
+    #tab-about { overflow-y: auto; }
+    .about-wrap { max-width: 720px; margin: 0 auto; padding: 40px 24px; }
+
+    .about-hero {
+      text-align: center; margin-bottom: 48px;
+    }
+    .about-hero .big-logo {
+      width: 72px; height: 72px; border-radius: 18px;
+      background: var(--brand);
+      display: flex; align-items: center; justify-content: center;
+      color: var(--white); font-weight: 900; font-size: 22px; letter-spacing: -1px;
+      margin: 0 auto 16px;
+    }
+    .about-hero h1 { font-size: 28px; font-weight: 900; color: var(--brand); margin-bottom: 10px; }
+    .about-hero p { font-size: 16px; color: var(--text-sub); line-height: 1.7; }
+
+    .about-section { margin-bottom: 40px; }
+    .about-section h2 {
+      font-size: 18px; font-weight: 800; margin-bottom: 12px;
+      padding-bottom: 10px; border-bottom: 2px solid var(--brand-light);
+      color: var(--text);
+    }
+    .about-section p {
+      font-size: 15px; color: var(--text-sub); line-height: 1.8;
+    }
+
+    .contact-card {
+      background: var(--white); border-radius: 12px;
+      border: 1.5px solid var(--border); padding: 24px;
+    }
+    .contact-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 0; border-bottom: 1px solid var(--border);
+    }
+    .contact-row:last-child { border-bottom: none; }
+    .contact-icon {
+      width: 36px; height: 36px; border-radius: 9px;
+      background: var(--brand-light); display: flex; align-items: center; justify-content: center;
+      font-size: 16px; flex-shrink: 0;
+    }
+    .contact-row .label { font-size: 12px; color: var(--text-sub); }
+    .contact-row .value { font-size: 15px; font-weight: 600; color: var(--text); }
+    .contact-row a { color: var(--brand); text-decoration: none; }
+    .contact-row a:hover { text-decoration: underline; }
+
+    /* Inquiry form */
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+    .form-group input, .form-group textarea {
+      width: 100%; padding: 11px 14px;
+      border: 1.5px solid var(--border); border-radius: var(--radius);
+      font-size: 14px; font-family: inherit; outline: none;
+      transition: border-color .2s;
+    }
+    .form-group input:focus, .form-group textarea:focus { border-color: var(--brand); }
+    .form-group textarea { resize: vertical; min-height: 100px; }
+    .btn-submit {
+      width: 100%; padding: 13px;
+      background: var(--brand); color: var(--white);
+      border: none; border-radius: var(--radius);
+      font-size: 15px; font-weight: 700; cursor: pointer;
+      transition: background .15s;
+    }
+    .btn-submit:hover { background: var(--brand-dark); }
+
+    /* ── 지하철 호선 배지 ─────────────────────────────────────── */
+    .line-badges { display: inline-flex; gap: 3px; align-items: center; flex-wrap: wrap; }
+    .lb {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-width: 18px; height: 18px; border-radius: 50%;
+      font-size: 10px; font-weight: 800; color: #fff;
+      padding: 0 3px; flex-shrink: 0; line-height: 1;
+    }
+    .lb.lb-2   { background: #009944; }
+    .lb.lb-5   { background: #996CAC; }
+    .lb.lb-6   { background: #CD7C2F; }
+    .lb.lb-k   { background: #77C4A3; font-size: 9px; min-width: 22px; border-radius: 9px; } /* 경의 */
+    .lb.lb-a   { background: #0090D2; font-size: 9px; min-width: 22px; border-radius: 9px; } /* 공항 */
+
+    /* ── 역 마커 ────────────────────────────────────────────────── */
+    .station-marker {
+      position: relative;
+      width: 1px; height: 1px;   /* 중심점만 차지, 사각형은 absolute */
+      pointer-events: none; cursor: default;
+    }
+    .station-rect {
+      position: absolute;
+      width: 26px; height: 7px;
+      border-radius: 2px;
+      border: 1.5px solid #fff;
+      box-shadow: 0 1px 5px rgba(0,0,0,.35);
+      transform-origin: center center;
+      top: -3.5px; left: -13px;
+    }
+    .station-label-always {
+      position: absolute;
+      top: 8px; left: 50%; transform: translateX(-50%);
+      font-size: 10px; font-weight: 800; color: #111;
+      white-space: nowrap;
+      background: rgba(255,255,255,.92);
+      padding: 1px 5px; border-radius: 4px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.15);
+      pointer-events: none;
+    }
+    /* 줌아웃: 작은 원형 점 */
+    .station-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      border: 2px solid #fff;
+      box-shadow: 0 1px 4px rgba(0,0,0,.4);
+    }
+    /* 권역 pill */
+    .zone-pill {
+      padding: 6px 12px; border-radius: 999px; font-size: 13px; font-weight: 600;
+      background: rgba(255,255,255,.92); border: 1.5px solid var(--border);
+      color: var(--text); cursor: pointer; white-space: nowrap;
+      backdrop-filter: blur(6px); pointer-events: all;
+      transition: background .15s, color .15s, border-color .15s;
+    }
+    .zone-pill.active {
+      background: var(--brand); border-color: var(--brand); color: var(--white);
+    }
+    .zone-polygon { cursor: pointer; }
+
+    /* ── 지도 우측: 레이어 표시 설정 ──────────────────── */
+    #map-toggles {
+      position: absolute; bottom: 26px; right: 10px; z-index: 500;
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .map-toggle {
+      width: 40px; height: 40px; padding: 0;
+      border-radius: 8px; border: 1.5px solid var(--border);
+      background: var(--white); color: #555; cursor: pointer;  /* 무난한 회색 */
+      box-shadow: 0 2px 8px rgba(0,0,0,.18);
+      display: flex; align-items: center; justify-content: center;
+      transition: color .15s, border-color .15s;
+    }
+    .map-toggle svg { display: block; }
+    .map-toggle:hover { color: #222; border-color: #c8c8c8; }
+
+    /* 레이어 선택 팝오버 */
+    #layer-panel {
+      position: absolute; right: 48px; bottom: 0;
+      background: var(--white); border: 1.5px solid var(--border);
+      border-radius: 10px; box-shadow: 0 3px 14px rgba(0,0,0,.18);
+      padding: 5px; min-width: 118px; display: none;
+    }
+    #layer-panel.open { display: block; }
+    .lp-row {
+      display: flex; align-items: center; justify-content: space-between; gap: 14px;
+      padding: 7px 9px; border-radius: 7px; cursor: pointer;
+      font-size: 13px; font-weight: 600; color: #444; white-space: nowrap;
+    }
+    .lp-row:hover { background: var(--bg); }
+    .lp-row span { display: flex; align-items: center; color: #555; }
+    .lp-row input { width: 16px; height: 16px; cursor: pointer; accent-color: #666; }
+
+
+    /* ─── Scrollbar ─────────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #ddd; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #bbb; }
+
+    /* ─── No result ─────────────────────────────────────────────── */
+    .no-result {
+      text-align: center; padding: 40px 0; color: var(--text-sub); font-size: 14px;
+    }
+
+    /* ─── Responsive ─────────────────────────────────────────────── */
+    @media (max-width: 640px) {
+      /* Header compact */
+      header { padding: 0 14px; }
+      .logo-text { font-size: 15px; }
+      nav.tab-nav button { padding: 0 12px; font-size: 13px; }
+
+      /* Map tab(모바일): 검색바 상단 + 지도. 결과 리스트만 숨김 */
+      .map-body { flex-direction: column; }
+      .map-sidebar {
+        width: 100%; height: auto; flex-shrink: 0;
+        border-right: none; border-bottom: 1px solid var(--border);
+      }
+      .sidebar-controls { padding: 10px; gap: 6px; }
+      .result-list { display: none; }   /* 결과 리스트는 모바일에서 숨김 (지도 마커/팝업으로 대체) */
+      .map-stage { flex: 1; min-height: 0; }
+      #map { flex: 1; min-height: 0; }
+      #map-toggles { bottom: 26px; right: 8px; }
+      .map-toggle { width: 38px; height: 38px; }
+
+      /* Contents tab */
+      .contents-header { padding: 0 12px; overflow-x: auto; }
+      .contents-header button { padding: 14px 14px; font-size: 13px; white-space: nowrap; }
+      .content-section { padding: 20px 14px; }
+      .section-title { font-size: 18px; }
+      .card-grid { grid-template-columns: 1fr; }
+      .card-img { height: 130px; }
+
+      /* About tab */
+      .about-wrap { padding: 24px 14px; }
+    }
+    /* ─── 로딩 스플래시 (걷는 모션) ─────────────────────────────── */
+    #splash {
+      position: fixed; inset: 0; z-index: 9999;
+      background: #ffffff;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 13px;
+      transition: opacity .5s ease, visibility .5s ease;
+    }
+    #splash.hide { opacity: 0; visibility: hidden; }
+    #splash .walker { height: 50px; display: flex; align-items: flex-end; }
+    #splash .walker img { height: 50px; width: auto; transform-origin: 50% 92%; animation: dobo-walk .62s infinite ease-in-out; }
+    #splash .load-word {
+      width: 95px; height: auto;
+      opacity: 0; transform: translateY(8px);
+      animation: dobo-appear .5s ease forwards .3s;
+    }
+    /* 좌우로 뒤뚱이며 한 발씩 딛는 느낌(펭귄 워들) */
+    @keyframes dobo-walk {
+      0%   { transform: rotate(-6deg) translateY(0); }
+      25%  { transform: rotate(-3deg) translateY(-6px); }
+      50%  { transform: rotate(6deg)  translateY(0); }
+      75%  { transform: rotate(3deg)  translateY(-6px); }
+      100% { transform: rotate(-6deg) translateY(0); }
+    }
+    @keyframes dobo-appear{ to{opacity:1;transform:translateY(0)} }
+    @media (prefers-reduced-motion: reduce){
+      #splash .walker img, #splash .load-word { animation-duration: .01ms; animation-iteration-count: 1; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ════════════════════════ 로딩 스플래시 ════════════════════════ -->
+<div id="splash">
+  <div class="walker">
+    <img src="walk_full.png" alt="" />
+  </div>
+  <img class="load-word" src="dobo_word.png" alt="도보마포" />
+</div>
+<script>
+  (function(){
+    var sp=document.getElementById('splash'); if(!sp) return;
+    var t0=Date.now();
+    function hide(){ var wait=Math.max(0,1000-(Date.now()-t0)); setTimeout(function(){sp.classList.add('hide');},wait); }
+    if(document.readyState==='complete') hide(); else window.addEventListener('load',hide);
+    setTimeout(function(){sp.classList.add('hide');},3300); // 안전장치
+  })();
+</script>
+
+<!-- ════════════════════════ HEADER ════════════════════════ -->
+<header>
+  <a class="logo" href="#">
+    <img src="dobomapo_logo.png" alt="도보마포" style="height:38px;width:auto;display:block;" />
+  </a>
+  <nav class="tab-nav">
+    <button class="active" data-tab="map">지도</button>
+    <button data-tab="contents">콘텐츠</button>
+    <button data-tab="about">소개</button>
+  </nav>
+</header>
+
+<!-- ════════════════════════ MAIN ════════════════════════ -->
+<main>
+
+  <!-- ───────── TAB 1: MAP ───────── -->
+  <section id="tab-map" class="tab-panel active">
+
+    <!-- 본문: 결과 사이드바 + 지도 -->
+    <div class="map-body">
+      <aside class="map-sidebar">
+        <div class="sidebar-controls">
+          <div class="search-wrap">
+            <input type="text" id="search-input" placeholder="가게 이름으로 검색…" autocomplete="off" />
+            <button class="search-clear" id="search-clear" type="button">✕</button>
+            <span class="search-icon" id="search-icon">🔍</span>
+            <div class="search-suggestions" id="search-suggestions"></div>
+          </div>
+        </div>
+        <div class="result-list" id="result-list">
+          <div class="result-count" id="result-count"></div>
+        </div>
+      </aside>
+
+      <div class="map-stage">
+        <!-- 지도 위에 떠 있는 오버레이: 권역/카테고리 필터 -->
+        <div id="map-overlay">
+          <!-- 권역 필터 (JS로 동적 생성) -->
+          <div id="zone-overlay"></div>
+          <!-- 카테고리 필터 -->
+          <div id="cat-overlay">
+            <button class="cat-pill active" data-cat="all">전체</button>
+            <button class="cat-pill" data-cat="음식점"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#E8552D" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h2c1.1 0 2-.9 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg>음식점</button>
+            <button class="cat-pill" data-cat="카페"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#B07A3C" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2v2"/><path d="M14 2v2"/><path d="M6 2v2"/><path d="M17 9H4a1 1 0 0 0-1 1v7a4 4 0 0 0 4 4h6a4 4 0 0 0 4-4h1a3 3 0 0 0 0-6h-1Z"/></svg>카페</button>
+            <button class="cat-pill" data-cat="바·주점"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#7C3AED" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M8 22h8"/><path d="M12 15v7"/><path d="M12 15a5 5 0 0 0 5-5c0-2-.5-4-1-8H8c-.5 4-1 6-1 8a5 5 0 0 0 5 5Z"/></svg>바·주점</button>
+            <button class="cat-pill" data-cat="편집샵"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#0E9488" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>편집샵</button>
+            <button class="cat-pill" data-cat="기타"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#6B7280" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg>기타</button>
+          </div>
+        </div>
+
+        <div id="map" style="flex:1;"></div>
+        <!-- 지도 우측: 레이어 표시 설정 -->
+        <div id="map-toggles">
+          <button id="layer-btn" class="map-toggle" type="button" title="레이어 표시 설정" aria-label="레이어 표시 설정">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><polygon points="12 3 21 8 12 13 3 8 12 3"/><polyline points="3 12 12 17 21 12"/><polyline points="3 16 12 21 21 16"/></svg>
+          </button>
+          <div id="layer-panel">
+            <label class="lp-row"><span><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" style="vertical-align:-3px;margin-right:6px;"><polygon points="12 3 21 8 12 13 3 8 12 3"/><polyline points="3 12 12 17 21 12"/></svg>권역</span><input type="checkbox" id="lp-zone" checked /></label>
+            <label class="lp-row"><span><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" style="vertical-align:-3px;margin-right:6px;"><rect x="5" y="3" width="14" height="15" rx="3.5"/><line x1="5" y1="11" x2="19" y2="11"/><line x1="8" y1="18" x2="6.2" y2="21"/><line x1="16" y1="18" x2="17.8" y2="21"/></svg>지하철</span><input type="checkbox" id="lp-subway" checked /></label>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───────── TAB 2: CONTENTS ───────── -->
+  <section id="tab-contents" class="tab-panel">
+    <div class="contents-header">
+      <button class="active" data-section="notice">📢 공지사항</button>
+      <button data-section="cardnews">🃏 카드뉴스</button>
+      <button data-section="monthly">📅 월간 마포구</button>
+      <button data-section="people">🤝 사람이 좋다</button>
+    </div>
+
+    <!-- 공지사항 -->
+    <div class="content-section active" id="section-notice">
+      <h2 class="section-title">공지사항</h2>
+      <p class="section-sub">도보마포의 새 소식을 전달합니다.</p>
+      <div class="notice-list">
+        <div class="notice-item">
+          <span class="notice-badge new">NEW</span>
+          <div class="notice-text">
+            <div class="notice-title">도보마포 사이트가 오픈했습니다 🎉</div>
+            <div class="notice-date">2025.06.07</div>
+          </div>
+        </div>
+        <div class="notice-item">
+          <span class="notice-badge new">NEW</span>
+          <div class="notice-text">
+            <div class="notice-title">월간 마포구 6월호가 업로드되었습니다</div>
+            <div class="notice-date">2025.06.01</div>
+          </div>
+        </div>
+        <div class="notice-item">
+          <span class="notice-badge normal">공지</span>
+          <div class="notice-text">
+            <div class="notice-title">도보마포 인스타그램 팔로우 부탁드립니다</div>
+            <div class="notice-date">2025.05.15</div>
+          </div>
+        </div>
+        <div class="notice-item">
+          <span class="notice-badge normal">공지</span>
+          <div class="notice-text">
+            <div class="notice-title">콘텐츠 제보 및 협업 문의 안내</div>
+            <div class="notice-date">2025.05.01</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 카드뉴스 -->
+    <div class="content-section" id="section-cardnews">
+      <h2 class="section-title">카드뉴스</h2>
+      <p class="section-sub">마포구 이야기를 카드뉴스로 만나보세요.</p>
+      <div class="card-grid">
+        <div class="card">
+          <div class="card-img">
+            <span class="badge">카드뉴스</span>
+            🃏
+          </div>
+          <div class="card-body">
+            <div class="card-date">2025.06.05</div>
+            <div class="card-title">합정동, 한강과 골목 사이의 감성 동네</div>
+            <div class="card-desc">합정동의 골목 카페와 독립서점을 소개합니다.</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-img">
+            <span class="badge">카드뉴스</span>
+            🃏
+          </div>
+          <div class="card-body">
+            <div class="card-date">2025.05.28</div>
+            <div class="card-title">망원시장 완전정복 — 꼭 먹어야 할 것들</div>
+            <div class="card-desc">현지인이 추천하는 망원시장 필수 코스.</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-img">
+            <span class="badge">카드뉴스</span>
+            🃏
+          </div>
+          <div class="card-body">
+            <div class="card-date">2025.05.20</div>
+            <div class="card-title">연남동 경의선 숲길 봄 산책 코스</div>
+            <div class="card-desc">꽃피는 봄날 경의선 숲길을 걸어보세요.</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-img">
+            <span class="badge">카드뉴스</span>
+            🃏
+          </div>
+          <div class="card-body">
+            <div class="card-date">2025.05.10</div>
+            <div class="card-title">상암동 하늘공원에서 바라본 서울 야경</div>
+            <div class="card-desc">마포에서 가장 높은 곳에서 내려다보는 서울.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 월간 마포구 -->
+    <div class="content-section" id="section-monthly">
+      <h2 class="section-title">월간 마포구</h2>
+      <p class="section-sub">매달 마포구의 이야기를 담아 전달합니다.</p>
+      <div class="card-grid">
+        <div class="card">
+          <div class="card-img" style="background: linear-gradient(135deg, #f8edf2, #e8c4d8);">
+            <span class="badge">2025.06</span>
+            📅
+          </div>
+          <div class="card-body">
+            <div class="card-date">2025년 6월호</div>
+            <div class="card-title">여름이 오는 마포 — 한강변 나들이 특집</div>
+            <div class="card-desc">더워지는 계절, 마포에서 즐기는 한강 라이프.</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-img" style="background: linear-gradient(135deg, #f8edf2, #e8c4d8);">
+            <span class="badge">2025.05</span>
+            📅
+          </div>
+          <div class="card-body">
+            <div class="card-date">2025년 5월호</div>
+            <div class="card-title">봄의 마포 — 꽃과 골목을 걷다</div>
+            <div class="card-desc">봄바람 따라 걷는 마포구 꽃길 투어.</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-img" style="background: linear-gradient(135deg, #f8edf2, #e8c4d8);">
+            <span class="badge">2025.04</span>
+            📅
+          </div>
+          <div class="card-body">
+            <div class="card-date">2025년 4월호</div>
+            <div class="card-title">마포의 새 얼굴 — 오픈한 공간들</div>
+            <div class="card-desc">이번 달 마포에 새로 생긴 공간을 소개합니다.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 사람이 좋다 -->
+    <div class="content-section" id="section-people">
+      <h2 class="section-title">사람이 좋다</h2>
+      <p class="section-sub">마포에서 만난 사람들의 이야기.</p>
+      <div class="card-grid">
+        <div class="card">
+          <div class="card-img" style="background: linear-gradient(135deg, #f5f0ff, #e0d4f5);">
+            <span class="badge">인터뷰</span>
+            🤝
+          </div>
+          <div class="card-body">
+            <div class="card-date">2025.06.03</div>
+            <div class="card-title">15년째 합정에서 빵을 굽는 사람</div>
+            <div class="card-desc">골목 안 작은 베이커리를 지키는 이야기.</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-img" style="background: linear-gradient(135deg, #f5f0ff, #e0d4f5);">
+            <span class="badge">인터뷰</span>
+            🤝
+          </div>
+          <div class="card-body">
+            <div class="card-date">2025.05.25</div>
+            <div class="card-title">망원동 책방 주인이 마포를 사랑하는 이유</div>
+            <div class="card-desc">동네 서점이 살아남는 법.</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-img" style="background: linear-gradient(135deg, #f5f0ff, #e0d4f5);">
+            <span class="badge">인터뷰</span>
+            🤝
+          </div>
+          <div class="card-body">
+            <div class="card-date">2025.05.14</div>
+            <div class="card-title">연남동 플로리스트의 꽃처럼 사는 하루</div>
+            <div class="card-desc">꽃 한 송이에 마포를 담는 사람.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───────── TAB 3: 소개 ───────── -->
+  <section id="tab-about" class="tab-panel">
+    <div class="about-wrap">
+
+      <!-- Hero -->
+      <div class="about-hero">
+        <img src="dobomapo_logo.png" alt="도보마포" style="width:240px;max-width:80%;height:auto;display:block;margin:0 auto 18px;" />
+        <p>마포구를 두 발로 걸으며 발견한<br>골목, 사람, 그리고 이야기들.</p>
+      </div>
+
+      <!-- 소개 -->
+      <div class="about-section">
+        <h2>도보마포 소개</h2>
+        <p>
+          도보마포는 마포구의 숨겨진 이야기를 걸어서 직접 발굴하는 로컬 콘텐츠 채널입니다.<br><br>
+          합정동의 골목 카페부터 망원시장의 단골 맛집, 연남동의 작은 서점까지 — 지도 앱에는 나오지 않는 진짜 마포의 이야기를 전합니다.<br><br>
+          인스타그램을 통해 꾸준히 콘텐츠를 업로드하고 있으며, 이 사이트는 그 모든 장소를 한 눈에 볼 수 있도록 만들어진 공간입니다.
+        </p>
+      </div>
+
+      <!-- 연락처 -->
+      <div class="about-section">
+        <h2>연락처</h2>
+        <div class="contact-card">
+          <div class="contact-row">
+            <div class="contact-icon">📸</div>
+            <div>
+              <div class="label">인스타그램</div>
+              <div class="value"><a href="https://www.instagram.com/dobo_mapo" target="_blank">@dobo_mapo</a></div>
+            </div>
+          </div>
+          <div class="contact-row">
+            <div class="contact-icon">✉️</div>
+            <div>
+              <div class="label">이메일</div>
+              <div class="value"><a href="mailto:dobomapo@gmail.com">dobomapo@gmail.com</a></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 문의 폼 -->
+      <div class="about-section">
+        <h2>문의사항</h2>
+        <div class="contact-card">
+          <form onsubmit="handleSubmit(event)">
+            <div class="form-group">
+              <label>이름</label>
+              <input type="text" placeholder="이름을 입력해주세요" required />
+            </div>
+            <div class="form-group">
+              <label>이메일</label>
+              <input type="email" placeholder="답장 받을 이메일 주소" required />
+            </div>
+            <div class="form-group">
+              <label>문의 내용</label>
+              <textarea placeholder="협업 제안, 장소 제보, 기타 문의 등 자유롭게 남겨주세요." required></textarea>
+            </div>
+            <button type="submit" class="btn-submit">문의 보내기</button>
+          </form>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+</main>
+
+<!-- ════════════════════════ SCRIPTS ════════════════════════ -->
+<script>
+
+/* ──────────────────────────────────────────────────────────
+   DATA — 샘플 콘텐츠 (추후 실제 데이터로 교체)
+   필드: id, title, station(역 이름), category, lat, lng, description, instagram
+   ────────────────────────────────────────────────────────── */
+const CONTENTS = [{"id": 0, "title": "맵서울", "station": "합정", "category": "바·주점", "zone": "hapjeong", "lat": 37.55032, "lng": 126.91114, "hours": "19:00-24:00 (금,토 새벽1시까지)", "addr": "월드컵로3길 32", "description": "음악 공간 칵테일 삼박자. 캄파리오렌지, 진토닉, 마티니 등 가벼운 칵테일 위주. 인스타 @mapseoul", "instagram": "https://www.instagram.com/dobomapo/p/DZSMmH-GAmO/", "date": "2026.06.07", "closed": false}, {"id": 1, "title": "쑨송", "station": "망원", "category": "음식점", "zone": "hapjeong", "lat": 37.54882, "lng": 126.91022, "hours": "하루 70그릇 한정 판매", "addr": "포은로 63", "description": "태국대사관 셰프 출신. 태국식 소갈비 쌀국수. 람보르기니 쌀국수 인기. 주소는 도보레터 기준(포은로 63), 본문에 주소 미기재. #도보마포_망원", "instagram": "https://www.instagram.com/dobomapo/p/DZOmu2AGK0N/", "date": "2026.06.06", "closed": false}, {"id": 2, "title": "피제리아더키", "station": "대흥", "category": "음식점", "zone": "seogangdae", "lat": 37.54981, "lng": 126.93698, "hours": "11:00-22:00", "addr": "광성로 42-1", "description": "나폴리 인증 화덕피자. 옆 카밀드 레스토랑과 공간 공유, 서로 메뉴 주문 가능. 인스타 @pizzeria_ducky. #도보마포_대흥", "instagram": "https://www.instagram.com/dobomapo/p/DY_KxRHGPm2/", "date": "2026.05.31", "closed": false}, {"id": 3, "title": "히메지", "station": "홍대입구", "category": "음식점", "zone": null, "lat": 37.56847, "lng": 126.9286, "hours": "12:00-21:00 (토,일 13시 오픈 / 수 휴무)", "addr": "연희로11길 41", "description": "10년 넘은 노포 일본식 숙성카레. 카레우동, 간장우동, 유부우동도 인기. 인스타 @himeji_hiro_royalsaloon. #도보마포_연희", "instagram": "https://www.instagram.com/dobomapo/p/DY6DtjXGBlT/", "date": "2026.05.29", "closed": false}, {"id": 4, "title": "써니드라이", "station": "이대", "category": "카페", "zone": "seogangdae", "lat": 37.54724, "lng": 126.94188, "hours": "09:00-18:00", "addr": "대흥로 147", "description": "숭문고 정문 앞. 신도림 대장 카페 '헤비로테이트' 출신 바리스타 독립 운영. 필터커피, 스몰라떼, 화이트모카 등. 반려동물 동반 가능. 인스타 @sunnydrycoffee. #도보마포_이대", "instagram": "https://www.instagram.com/dobomapo/p/DY03vCpGBiu/", "date": "2026.05.27", "closed": false}, {"id": 5, "title": "용강동 숯불쭈꾸미", "station": "마포", "category": "음식점", "zone": "gongdeok", "lat": 37.54009, "lng": 126.94367, "hours": "17:00-23:00 (토 21:30까지 / 일 휴무)", "addr": "토정로 35길 4-1", "description": "Since 1991. 30년 이상 운영. 숯불 쭈꾸미 전문. 라면 인기. #도보마포_마포", "instagram": "https://www.instagram.com/dobomapo/p/DYzAFJBGF5V/", "date": "2026.05.26", "closed": false}, {"id": 6, "title": "때때", "station": "홍대입구", "category": "카페", "zone": null, "lat": 37.5677, "lng": 126.9285, "hours": "10:00-19:00", "addr": "연희맛로38", "description": "전 돈워리비달리 파티셰 장희정 운영. 블루베리 바닐라 타르트, 파인샌드인샌드쿠키 인기. 인스타 @ttaettae.seoul. #도보마포_연희", "instagram": "https://www.instagram.com/dobomapo/p/DYtHJxYGKu4/", "date": "2026.05.24", "closed": false}, {"id": 7, "title": "홍등롱", "station": "대흥", "category": "음식점", "zone": "seogangdae", "lat": 37.5495, "lng": 126.93775, "hours": "17:00-05:00", "addr": "서울 마포구 광성로4길 11-5", "description": "서강대 앞 중식주점. 꿔바로우, 볶음라면, 마파두부 인기. 가성비 좋은 앉음뱅이 술집. #도보마포_대흥", "instagram": "https://www.instagram.com/dobomapo/p/DYopxnJGDux/", "date": "2026.05.22", "closed": false}, {"id": 8, "title": "남북통일", "station": "합정", "category": "음식점", "zone": "hapjeong", "lat": 37.55337, "lng": 126.90895, "hours": "11:00-21:30 (일 휴무)", "addr": "동교로 18길 37", "description": "1994년부터 운영. 평양식 김치만두 만두전골, 닭칼국수. 매일 직접 빚는 만두. #도보마포_서교", "instagram": "https://www.instagram.com/dobomapo/p/DYi1LexmPNL/", "date": "2026.05.20", "closed": false}, {"id": 9, "title": "성산콩국", "station": "망원", "category": "음식점", "zone": "mangwon", "lat": 37.56185, "lng": 126.90643, "hours": "11:00-20:00 (15-17 브레이크)", "addr": "성미산로1길 5", "description": "합정 와인바 시소 사장님의 새 공간. 매일 맷돌로 갈아낸 국내산 백태 콩물. 가오픈 중 (이후 요우티아오, 찹쌀도너츠 추가 예정). 인스타 @de_seesaw. #도보마포_성산", "instagram": "https://www.instagram.com/dobomapo/p/DYgPSY9mNsJ/", "date": "2026.05.19", "closed": false}, {"id": 10, "title": "가츠시", "station": "합정", "category": "음식점", "zone": "hongdae", "lat": 37.55434, "lng": 126.91695, "hours": "11:00-21:30", "addr": "동교로18길 5", "description": "안심·등심·모밀, 김치치즈나베 인기. 동네 돈까스집. 가격·양·맛 올라운더. #도보마포_서교", "instagram": "https://www.instagram.com/dobomapo/p/DYefKHVmNT9/", "date": "2026.05.18", "closed": false}, {"id": 11, "title": "릿 카운터", "station": "홍대입구", "category": "카페", "zone": null, "lat": 37.57046, "lng": 126.92724, "hours": "09:00-18:00 (월,화 휴무)", "addr": "연희로11길 71", "description": "제주에서 연희동으로 이전. 후무스, 풀드포크 베네딕트, 핫 치킨버거 인기. 반려동물 동반 가능. 인스타 @reet.counter. #도보마포_연희", "instagram": "https://www.instagram.com/dobomapo/p/DYbF6ccmOnk/", "date": "2026.05.17", "closed": false}, {"id": 12, "title": "둥둥막창구이", "station": "합정", "category": "음식점", "zone": "hapjeong", "lat": 37.55002, "lng": 126.9102, "hours": "16:00-23:50 (일 휴무)", "addr": "월드컵로3길 27", "description": "돼지막창+소막창. 4명 이상 6시까지 예약 가능. 웨이팅 기본. #도보마포_합정", "instagram": "https://www.instagram.com/dobomapo/p/DYRfcUzGKA1/", "date": "2026.05.13", "closed": false}, {"id": 13, "title": "리틀스탠드레몽", "station": "마포구청", "category": "음식점", "zone": "mangwon", "lat": 37.55793, "lng": 126.89833, "hours": "15:00-23:00 (월 휴무 / 오마카세 타임 15-17:30)", "addr": "방울내로 24-1", "description": "국내 유일 레몬 전문바. 레몬 오마카세 1인 5만원 5코스. 계절마다 구성 변경. 인스타 @little.stand_lemon. #도보마포_망원", "instagram": "https://www.instagram.com/dobomapo/p/DYO6xC-GN7o/", "date": "2026.05.12", "closed": false}, {"id": 14, "title": "오향만두", "station": "홍대입구", "category": "음식점", "zone": null, "lat": 37.56689, "lng": 126.92972, "hours": "11:30-21:00 (15-17:30 브레이크 / 수,목 휴무)", "addr": "연희맛로 22", "description": "연희동 사러가마트 앞. 중국식 만두 전문. 군만두·찐만두·물만두 모두 손으로 빚음. 탕수육, 깐풍기 등도 인기. #도보마포_연희", "instagram": "https://www.instagram.com/dobomapo/p/DYLs_7GGCkf/", "date": "2026.05.11", "closed": false}, {"id": 15, "title": "그레이스국밥", "station": "공덕", "category": "음식점", "zone": "gongdeok", "lat": 37.54693, "lng": 126.95457, "hours": "10:30-22:00 (15-17 브레이크 / 일 휴무)", "addr": "마포대로12길 18", "description": "국내산 K-버크셔 돼지고기. 금빛 그릇 국밥. 예약 필수 족발·수육. 수제맥주·막걸리 라인업. 인스타 @gracegukbap. #도보마포_공덕", "instagram": "https://www.instagram.com/dobomapo/p/DYEmINJGOT-/", "date": "2026.05.08", "closed": false}, {"id": 16, "title": "사운즈굿", "station": "홍대입구", "category": "편집샵", "zone": "hongdae", "lat": 37.56432, "lng": 126.9228, "hours": "13:00-20:00 (월 휴무)", "addr": "성미산로29길 26", "description": "연남동 레코드샵. 재즈, 소울, 펑크 등 블랙뮤직 중심. 빈티지 LP, 12인치 싱글. 굿즈(모자, 티셔츠) 판매. 인스타 @soundsgood_store. #도보마포_연남", "instagram": "https://www.instagram.com/dobomapo/p/DX-yvjHGCNS/", "date": "2026.05.06", "closed": false}, {"id": 17, "title": "비빔파스타클럽", "station": "이대", "category": "음식점", "zone": "seogangdae", "lat": 37.5566, "lng": 126.94287, "hours": "11:00-20:00 (화 휴무)", "addr": "신촌역로22-5 2층", "description": "혼밥 전문 비빔파스타. 쿠팡이츠 가능. 양이 많음. 인스타 @bibimpastaclub. #마포구맛집", "instagram": "https://www.instagram.com/dobomapo/p/DX5pDh7GNcI/", "date": "2026.05.04", "closed": false}, {"id": 18, "title": "스튜디오 오오이", "station": "대흥", "category": "기타", "zone": "seogangdae", "lat": 37.54816, "lng": 126.93922, "hours": "월감음감회 예약 매달 1일 20:00 오픈", "addr": "광성로6길 42", "description": "대흥 경의선숲길. 하이파이 스피커 갖춘 리스닝룸 스튜디오. 클래식/재즈/락 등 장르불문. 음악 관련 책과 LP 구비. 월감 음감회 운영. 인스타 @studioooe. #도보마포_대흥", "instagram": "https://www.instagram.com/dobomapo/p/DX1MVuQGCBL/", "date": "2026.05.02", "closed": false}, {"id": 19, "title": "무시로", "station": "대흥", "category": "음식점", "zone": "seogangdae", "lat": 37.54752, "lng": 126.93847, "hours": "18:00-24:00 (일, 월 휴무)", "addr": "독막로 221", "description": "신수동 동네 술집. 생선회, 아귀간 김밥, 마파두부, 냉제육, 스파게티 라면 인기. 인스타 @everydaymusiro. #도보마포_대흥", "instagram": "https://www.instagram.com/dobomapo/p/DXq2nrMCZMD/", "date": "2026.04.28", "closed": false}, {"id": 20, "title": "육장", "station": "망원", "category": "음식점", "zone": "mangwon", "lat": 37.55394, "lng": 126.90562, "hours": "11:00-20:00 (15-17 브레이크)", "addr": "포은로 75", "description": "망원동 육개장 전문. 2017년부터 시즌3 운영. 육개장, 육라면, 육갈탕, 달걀말이 육개장, 토마토 육개장 등. 셀프 밥 추가 가능. 인스타 @yookjang_mangwon. #도보마포_망원", "instagram": "https://www.instagram.com/dobomapo/p/DXoTqj7CbT9/", "date": "2026.04.27", "closed": false}, {"id": 21, "title": "르쁠레지흐뒤빵", "station": "서강대", "category": "카페", "zone": "seogangdae", "lat": 37.54978, "lng": 126.938, "hours": "08:00-20:00 (월 휴무)", "addr": "광성로17", "description": "프랑스 CAP Boulanger 자격 보유 사장님. 파리 레시피 그대로 사용. 크루아상, 바게트, 캄파뉴, 호밀빵 인기. 인스타 @leplaisir_dupain. #도보마포_대흥", "instagram": "https://www.instagram.com/dobomapo/p/DXgkij5CVLz/", "date": "2026.04.24", "closed": false}, {"id": 22, "title": "양푼탕", "station": "공덕", "category": "음식점", "zone": "gongdeok", "lat": 37.54808, "lng": 126.95516, "hours": "05:00-23:00", "addr": "마포대로14나길 6", "description": "묵은지·두부·고기 양푼탕. 서울서부검찰청 직원들 해장 성지. 연세 지극하신 할머니 운영 노포. #도보마포_공덕", "instagram": "https://www.instagram.com/dobomapo/p/DXeFJT4ibFw/", "date": "2026.04.23", "closed": false}, {"id": 23, "title": "우동카덴", "station": "합정", "category": "음식점", "zone": "hapjeong", "lat": 37.55171, "lng": 126.91508, "hours": "11:30-21:00 (14:40-17:30 브레이크/일 휴무)", "addr": "양화로7안길 2-1", "description": "오사카식 생우동. 붓카케, 자루, 크림, 카레, 마제 우동 등 다양한 메뉴. 무료 면 추가 가능. 미슐랭 단골 언급. 인스타 @jung_hoyoung_caden_. #도보마포_합정", "instagram": "https://www.instagram.com/dobomapo/p/DXZNKjNmI7K/", "date": "2026.04.21", "closed": false}, {"id": 24, "title": "형제식당", "station": "신촌", "category": "음식점", "zone": "hongdae", "lat": 37.5555, "lng": 126.93481, "hours": "10:30-20:00 (토 19:30까지 / 일 휴무)", "addr": "신촌로16길 4", "description": "광성고 앞 노포 백반집. 제육, 김치찌개, 매운갈비찜, 폭탄계란찜 인기. 셀프 밥 리필 가능. #마포구맛집", "instagram": "https://www.instagram.com/dobomapo/p/DXVobB7mPap/", "date": "2026.04.20", "closed": false}, {"id": 25, "title": "시네마치킨", "station": "가좌", "category": "음식점", "zone": null, "lat": 37.57592, "lng": 126.93137, "hours": "14:00-24:00", "addr": "홍연8길 3", "description": "홍제천 인근. 직접 염지한 생닭 튀김. 얼큰수제비 함께 인기. 70대 사장님 부부 운영. #도보마포_연희", "instagram": "https://www.instagram.com/dobomapo/p/DXOhnyYmPVn/", "date": "2026.04.17", "closed": false}, {"id": 26, "title": "도덕과규범", "station": "상수", "category": "카페", "zone": "hapjeong", "lat": 37.54881, "lng": 126.9235, "hours": "09:30-20:00", "addr": "독막로19길 32", "description": "자급자족 로스팅 커피. 턴테이블 음악. 스몰토크 분위기. 인스타 @doduk_kyubum. #도보마포_상수", "instagram": "https://www.instagram.com/dobomapo/p/DXLRxiFGBTh/", "date": "2026.04.16", "closed": false}, {"id": 27, "title": "커피 스테어", "station": "마포구청", "category": "카페", "zone": "mangwon", "lat": 37.55964, "lng": 126.90217, "hours": "10:00-18:30 (일 11:00-17:30)", "addr": "방울내로 54-1", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/DXX3zFDCrDv/", "date": "2026.04.14", "closed": false}, {"id": 28, "title": "카쩨", "station": "이대", "category": "카페", "zone": null, "lat": 37.55742, "lng": 126.94734, "hours": "11:00-21:00 (목 휴무)", "addr": "이화여대2길 26", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/DXPpJt1ih3p/", "date": "2026.04.11", "closed": false}, {"id": 29, "title": "비아 스탠딩바", "station": "망원", "category": "바·주점", "zone": "mangwon", "lat": 37.5554, "lng": 126.90777, "hours": "18:00-새벽2시 (일 15:00-24:00, 월 휴무)", "addr": "월드컵로13길 19-23", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/DXGsxGbh6vf/", "date": "2026.04.08", "closed": false}, {"id": 30, "title": "카페 마", "station": "홍대입구", "category": "카페", "zone": null, "lat": 37.56699, "lng": 126.92728, "hours": "09:00-18:00", "addr": "연희로11가길 48-10", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/DW7jAXpiA_T/", "date": "2026.04.04", "closed": false}, {"id": 31, "title": "에프이에이티", "station": "가좌", "category": "카페", "zone": "hongdae", "lat": 37.56414, "lng": 126.91754, "hours": "08:30-18:00 (월 휴무)", "addr": "성미산로17길 86", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/DWvX3XPCbMb/", "date": "2026.03.31", "closed": false}, {"id": 32, "title": "인시즌", "station": "홍대입구", "category": "기타", "zone": null, "lat": 37.56718, "lng": 126.93008, "hours": "10:00-21:00", "addr": "연희맛로 23", "description": "그로서리", "instagram": "https://www.instagram.com/dobomapo/p/DWjHj_JC7BF/", "date": "2026.03.26", "closed": false}, {"id": 33, "title": "매거진랜드", "station": "합정", "category": "편집샵", "zone": "hongdae", "lat": 37.55225, "lng": 126.92011, "hours": "10:30-19:00 (일 휴무)", "addr": "잔다리로6길 17", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/DWdrgYMiCpS/", "date": "2026.03.24", "closed": false}, {"id": 34, "title": "와규와규", "station": "대흥", "category": "음식점", "zone": "seogangdae", "lat": 37.54979, "lng": 126.93749, "hours": "11:00-22:00 (일 휴무)", "addr": "광성로 36", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/DWTCXjzCrBW/", "date": "2026.03.20", "closed": false}, {"id": 35, "title": "운카페에주께로", "station": "마포구청", "category": "카페", "zone": "mangwon", "lat": 37.56264, "lng": 126.90596, "hours": "10:00-21:00 (화 휴무)", "addr": "월드컵로32길 31", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/DWN0YMPiT1q/", "date": "2026.03.18", "closed": false}, {"id": 36, "title": "오복식당", "station": "망원", "category": "음식점", "zone": "mangwon", "lat": 37.55309, "lng": 126.90511, "hours": "11:00-21:00 (15:00-17:00 브레이크, 토 20:00 마감, 일 17:00 마감)", "addr": "희우정로10길 35", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/DWI6xsOCL8t/", "date": "2026.03.16", "closed": false}, {"id": 37, "title": "추수연남", "station": "홍대입구", "category": "음식점", "zone": "hongdae", "lat": 37.56515, "lng": 126.923, "hours": "12:00-21:00 (16:30-18:00 브레이크, 월 휴무)", "addr": "성미산로29안길 19-7", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/DWCzN77CWQ4/", "date": "2026.03.13", "closed": false}, {"id": 38, "title": "키오스크", "station": "망원", "category": "카페", "zone": "mangwon", "lat": 37.55434, "lng": 126.90696, "hours": "12:00-21:00 (일 휴무)", "addr": "월드컵로19길 74 2층", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/DV3oVl9iHb4/", "date": "2026.03.10", "closed": false}, {"id": 39, "title": "베케이션", "station": "마포구청", "category": "카페", "zone": "mangwon", "lat": 37.56055, "lng": 126.90693, "hours": "10:00-19:00 (토 18:00 마감, 일 휴무)", "addr": "성미산로1길 62", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/DVsX_j5CLWV/", "date": "2026.03.07", "closed": false}, {"id": 40, "title": "레커레커", "station": "DMC", "category": "카페", "zone": "sangam", "lat": 37.5745, "lng": 126.90107, "hours": "12:00-19:00 (화 휴무)", "addr": "불광천길 278", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/DVnBuKkCF0V/", "date": "2026.03.05", "closed": false}, {"id": 41, "title": "에토라", "station": "광흥창", "category": "카페", "zone": "seogangdae", "lat": 37.54589, "lng": 126.93512, "hours": "07:00-20:00 (토 12:00-24:00)", "addr": "토정로15길 14", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/DVVjJX3ixcw/", "date": "2026.03.02", "closed": false}, {"id": 42, "title": "코랏", "station": "망원", "category": "음식점", "zone": "mangwon", "lat": 37.55682, "lng": 126.90823, "hours": "11:30-21:00 (15:00-17:00 브레이크)", "addr": "월드컵로19길 14", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/DVKyvVbib64/", "date": "2026.02.27", "closed": false}, {"id": 43, "title": "그레인서울", "station": "홍대입구", "category": "음식점", "zone": null, "lat": 37.56671, "lng": 126.92692, "hours": "09:00-17:30", "addr": "연희로11가길 53 2층", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/DVHlafniV-X/", "date": "2026.02.26", "closed": false}, {"id": 44, "title": "매뉴팩트커피", "station": "홍대입구", "category": "카페", "zone": null, "lat": 37.57417, "lng": 126.93394, "hours": "08:30-18:30", "addr": "연희로 11길 29", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/DVEMGLuC9xw/", "date": "2026.02.24", "closed": false}, {"id": 45, "title": "남해바다", "station": "공덕", "category": "음식점", "zone": "gongdeok", "lat": 37.54243, "lng": 126.94736, "hours": "11:00-23:00", "addr": "토정로37길 46", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/DU-rK__CSdi/", "date": "2026.02.20", "closed": false}, {"id": 46, "title": "604서울", "station": "망원", "category": "카페", "zone": "hongdae", "lat": 37.5553, "lng": 126.91755, "hours": "08:00-15:00 (일 휴무)", "addr": "동교로 49", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/DU75olhiUgK/", "date": "2026.02.19", "closed": false}, {"id": 47, "title": "마포제일큰약국", "station": "망원", "category": "기타", "zone": "mangwon", "lat": 37.5621, "lng": 126.90468, "hours": "09:00-22:00", "addr": "월드컵로 123", "description": "마포구 최대규모 약국", "instagram": "https://www.instagram.com/dobomapo/p/DUzTAk-Cecr/", "date": "2026.02.16", "closed": false}, {"id": 48, "title": "도래노트", "station": "마포구청", "category": "카페", "zone": "mangwon", "lat": 37.56074, "lng": 126.90433, "hours": "10:00-16:30 (토,일 18시까지 / 목 휴무)", "addr": "방울내로 72", "description": "스페셜티 커피, 핸드드립 위주. 수제 카다멈번·리코타 츄로스", "instagram": "https://www.instagram.com/dobomapo/p/DUuQ1YMCTMa/", "date": "2026.02.14", "closed": false}, {"id": 49, "title": "리치몬드 과자점", "station": "홍대입구", "category": "카페", "zone": "mangwon", "lat": 37.56534, "lng": 126.91139, "hours": "08:00-22:00", "addr": "월드컵북로 86", "description": "1979년 개업. 마포구 3대 빵집. 밤식빵·슈크림·케이크. 조식 08-11시 8,800원", "instagram": "https://www.instagram.com/dobomapo/p/DUmYkuqCURY/", "date": "2026.02.11", "closed": false}, {"id": 50, "title": "황금콩밭", "station": "애오개", "category": "음식점", "zone": "gongdeok", "lat": 37.55095, "lng": 126.95669, "hours": "월-금 11:30-21:30 / 토,일 11:00-21:00 (15-17 브레이크)", "addr": "마포대로16길 9", "description": "미쉐린 가이드 등재. 100% 국내산 콩 두부 전문점. 보쌈·육전·해산물 메뉴도 보유", "instagram": "https://www.instagram.com/dobomapo/p/DUei-_gElfw/", "date": "2026.02.08", "closed": false}, {"id": 51, "title": "사이", "station": "합정", "category": "카페", "zone": "hapjeong", "lat": 37.54477, "lng": 126.91486, "hours": "11:00-19:00 (월 휴무)", "addr": "토정로4길 6-4", "description": "화과자 스튜디오. 녹차·홍차와 화과자 시즌 메뉴. 한국 전통 도래매듭에서 이름", "instagram": "https://www.instagram.com/dobomapo/p/DUX2c6FiU7g/", "date": "2026.02.05", "closed": false}, {"id": 52, "title": "서강곱창", "station": "서강대", "category": "음식점", "zone": "seogangdae", "lat": 37.55217, "lng": 126.93594, "hours": "16:00-22:00 (일 휴무)", "addr": "서강로16길 67", "description": "#도보마포_대흥. 불맛·고슬고슬한 야채곱창. 잡내 없이 고소한 알곱창. 1인 운영", "instagram": "https://www.instagram.com/dobomapo/p/DUSj18SCdjj/", "date": "2026.02.03", "closed": false}, {"id": 53, "title": "엄마식탁", "station": "홍대입구", "category": "음식점", "zone": null, "lat": 37.56627, "lng": 126.92815, "hours": "11:30-21:30 (일,월 휴무)", "addr": "연희맛로 17-21", "description": "비건·논비건 모두 가능. 우엉덮밥·소고기국수·카레덮밥·생채비빔밥·크래커 치킨", "instagram": "https://www.instagram.com/dobomapo/p/DUQVdocCapL/", "date": "2026.02.02", "closed": false}, {"id": 54, "title": "마디포차", "station": "합정", "category": "바·주점", "zone": "hapjeong", "lat": 37.55258, "lng": 126.91185, "hours": "17:00-24:00 (일 휴무)", "addr": "월드컵로 37", "description": "야장 테라스 운영. 오징어볶음·국물떡볶이·두부김치. 동네 포차", "instagram": "https://www.instagram.com/dobomapo/p/DULaYEXCeqJ/", "date": "2026.01.31", "closed": false}, {"id": 55, "title": "옥자", "station": "홍대입구", "category": "음식점", "zone": "hongdae", "lat": 37.5647, "lng": 126.92266, "hours": "11:00-21:00 (수 휴무 / 15-17 브레이크)", "addr": "성미산로29길 40-15", "description": "한국식 쌀국수 전문점. 모듬쌀국수·우삼겹된장비빔밥. 멘보샤·게살튀김·해물짜조", "instagram": "https://www.instagram.com/dobomapo/p/DUEpvF5koQE/", "date": "2026.01.29", "closed": false}, {"id": 56, "title": "스몰네스트", "station": "마포구청", "category": "편집샵", "zone": "mangwon", "lat": 37.56077, "lng": 126.90033, "hours": "13:00-19:00 (수 휴무)", "addr": "방울내로9안길 72", "description": "독립 작가 협업 전시·팝업·오브제 큐레이션 소품샵. 스몰네스트 굿즈 후드 판매", "instagram": "https://www.instagram.com/dobomapo/p/DUAoJsYic4Q/", "date": "2026.01.27", "closed": false}, {"id": 57, "title": "모노리스", "station": "마포구청", "category": "편집샵", "zone": "mangwon", "lat": 37.56099, "lng": 126.90199, "hours": "14:00-19:00 (화,수,목 휴무)", "addr": "방울내로7길 37", "description": "카나모노룸 계승. 빈티지·디자이너 브랜드 컵·그릇·조명·소품·오브제 리빙샵", "instagram": "https://www.instagram.com/dobomapo/p/DT2O4nrEjpQ/", "date": "2026.01.23", "closed": false}, {"id": 58, "title": "이품", "station": "홍대입구", "category": "음식점", "zone": null, "lat": 37.56752, "lng": 126.93008, "hours": "11:00-20:50 (15-17 브레이크 / 일 휴무)", "addr": "연희로11길 20", "description": "연희동 중식. 군만두·간짜장·삼선짬뽕·탕수육·볶음밥. 성시경 '먹을텐데' 출연", "instagram": "https://www.instagram.com/dobomapo/p/DTzvH3sibLi/", "date": "2026.01.22", "closed": false}, {"id": 59, "title": "옥정", "station": "서강대", "category": "음식점", "zone": "seogangdae", "lat": 37.5504, "lng": 126.93647, "hours": "11:30-14:30 (토,일 휴무)", "addr": "신수로 106", "description": "#도보마포_대흥. 이북식 평양 만둣국 전문. 사골국물. 포장 불가. 워크인 전용", "instagram": "https://www.instagram.com/dobomapo/p/DTxmzuKiVQl/", "date": "2026.01.21", "closed": false}, {"id": 60, "title": "소구장", "station": "신촌", "category": "음식점", "zone": "seogangdae", "lat": 37.55211, "lng": 126.93771, "hours": "15:00-22:00", "addr": "백범로 29", "description": "#도보마포_신촌. 스탠딩 떡볶이바. 쫄깃한 쌀떡·달달한 양념. 김말이·순대. 서강대 명물", "instagram": "https://www.instagram.com/dobomapo/p/DTuhYG4CXsD/", "date": "2026.01.20", "closed": false}, {"id": 61, "title": "빈스서울 갤러리", "station": "대흥", "category": "카페", "zone": "seogangdae", "lat": 37.5426, "lng": 126.93667, "hours": "10:00-20:00 (토 18시까지, 일 휴무)", "addr": "대흥로 108", "description": "2003년 개업. 커스텀 로스팅샵. 전 세계 생두 셀렉·현장 직화 로스팅. 갤러리 운영 병행", "instagram": "https://www.instagram.com/dobomapo/p/DTr9m6YCSzt/", "date": "2026.01.19", "closed": false}, {"id": 62, "title": "연희동국화빵", "station": "홍대입구", "category": "카페", "zone": null, "lat": 37.56655, "lng": 126.92851, "hours": "수목금 12:00-19:00, 토일 13:00-18:00 (월,화 휴무)", "addr": "연희맛로 17-21", "description": "2022년 오픈. 매주 바뀌는 국화빵. 호지차 슈크림·다크초콜릿 브라우니 맛 등", "instagram": "https://www.instagram.com/dobomapo/p/DTkt3hOiWL9/", "date": "2026.01.16", "closed": false}, {"id": 63, "title": "커피상점이심", "station": "홍대입구", "category": "카페", "zone": null, "lat": 37.57084, "lng": 126.92795, "hours": "12:00-19:00 (월 휴무)", "addr": "연희로15길 66", "description": "10년 넘은 로스터리 카페. 싱글오리진 드립. 튀르키예 전통 쉬틀리 카흐베 제공", "instagram": "https://www.instagram.com/dobomapo/p/DTjl47-CdCO/", "date": "2026.01.16", "closed": false}, {"id": 64, "title": "톨 with 사모님돈까스", "station": "대흥", "category": "음식점", "zone": "seogangdae", "lat": 37.54996, "lng": 126.94452, "hours": "10:30-21:00 (일 휴무)", "addr": "대흥로20안길 11", "description": "사모님돈까스 레시피 계승. 두꺼운 통등심·스프·땅콩소스 샐러드. 김치나베", "instagram": "https://www.instagram.com/dobomapo/p/DTc5V4diWUn/", "date": "2026.01.13", "closed": false}, {"id": 65, "title": "노흐아인말", "station": "망원", "category": "편집샵", "zone": "mangwon", "lat": 37.5564, "lng": 126.90034, "hours": "금토일월 12:00-18:00 (화수목 휴무)", "addr": "망원로 51 2층", "description": "유러피안 빈티지 셀렉샵. 빈티지 조명·가구·테이블웨어. 고장난 조명·시계 무상수리", "instagram": "https://www.instagram.com/dobomapo/p/DTWh0kZkjjH/", "date": "2026.01.11", "closed": false}, {"id": 66, "title": "마루돈까스", "station": "합정", "category": "음식점", "zone": "hapjeong", "lat": 37.54926, "lng": 126.91518, "hours": "11:00-21:00 (14:30-15:00 브레이크)", "addr": "양화로6길 17", "description": "2002년 개업. 일식 돈까스. 셀프깨갈이. 안심·등심·치즈·소바·우동 라인업", "instagram": "https://www.instagram.com/dobomapo/p/DTRrxWpiUdz/", "date": "2026.01.09", "closed": false}, {"id": 67, "title": "폴베리", "station": "합정", "category": "음식점", "zone": "hapjeong", "lat": 37.55004, "lng": 126.90845, "hours": "11:30-21:00 (15-17 브레이크 / 일 15시까지, 월 휴무)", "addr": "포은로 40", "description": "나폴리 정통 피자. 우리밀 도우. 마르게리따·사과 고르곤졸라. 김니노 셰프", "instagram": "https://www.instagram.com/dobomapo/p/DTNGIYWEuWh/", "date": "2026.01.07", "closed": false}, {"id": 68, "title": "연우김밥", "station": "상수", "category": "음식점", "zone": "hapjeong", "lat": 37.54677, "lng": 126.92332, "hours": "07:00-21:00 (일 07:30-19:30)", "addr": "와우산로 29", "description": "#도보마포_상수. 10년 가까이 영업. 꽃나물김밥·명태김밥·유부김밥·우엉김밥", "instagram": "https://www.instagram.com/dobomapo/p/DTHHXvsCQZa/", "date": "2026.01.05", "closed": false}, {"id": 69, "title": "고기도국수면", "station": "망원", "category": "음식점", "zone": "mangwon", "lat": 37.55597, "lng": 126.90928, "hours": "17:00-23:00 (월 휴무 / 토,일 16시 오픈)", "addr": "동교로9길 95", "description": "생삼겹갈비 비장탄 직화구이. 비빔국수. 10년 이상 망원동 주민 단골 고깃집", "instagram": "https://www.instagram.com/dobomapo/p/DTDQQ_OiU2V/", "date": "2026.01.03", "closed": false}, {"id": 70, "title": "논베", "station": "합정", "category": "바·주점", "zone": "hapjeong", "lat": 37.55017, "lng": 126.91067, "hours": "18:00-24:00 (토,일 17시 오픈 / 화 휴무)", "addr": "월드컵로3길 31-26", "description": "이자카야. 숙성 사시미·고등어 봉초밥·낫토파스타·레바파테·생선 술찜. 캐치테이블 예약", "instagram": "https://www.instagram.com/dobomapo/p/DS45D4qibNc/", "date": "2025.12.30", "closed": false}, {"id": 71, "title": "오레노라멘", "station": "합정", "category": "음식점", "zone": "hapjeong", "lat": 37.54674, "lng": 126.91785, "hours": "11:00-22:00", "addr": "독막로8길 16", "description": "2017년 개업. 토리빠이탄 라멘. 닭육수·수비드 닭가슴살·반숙란. 면·밥·국물 리필 가능", "instagram": "https://www.instagram.com/dobomapo/p/DSz7K4pCYaC/", "date": "2025.12.28", "closed": false}, {"id": 72, "title": "파파연희", "station": "홍대입구", "category": "편집샵", "zone": null, "lat": 37.56814, "lng": 126.92901, "hours": "주말 12:00-19:00 (평일 DM 문의)", "addr": "연희로11가길 8", "description": "빈티지 LP·그릇·도자기·고가구·올림픽 기념품·카메라 등 60년 수집품 판매", "instagram": "https://www.instagram.com/dobomapo/p/DSuhqFeicA0/", "date": "2025.12.26", "closed": false}, {"id": 73, "title": "커피양장", "station": "광흥창", "category": "카페", "zone": "seogangdae", "lat": 37.54695, "lng": 126.929, "hours": "08:00-22:00 (월 휴무)", "addr": "독막로22길 14", "description": "#도보마포_광흥창. 1959년 건물 개조. 드립커피·위스키·안주. 저녁엔 바로 운영", "instagram": "https://www.instagram.com/dobomapo/p/DSliwxhEoDR/", "date": "2025.12.23", "closed": false}, {"id": 74, "title": "맛이차이나", "station": "상수", "category": "음식점", "zone": "hapjeong", "lat": 37.54759, "lng": 126.92086, "hours": "11:30-22:00 (16-17 브레이크)", "addr": "독막로 68 3층", "description": "신라호텔 팔선 출신 조승희 셰프, 중식, 짜장면/탕수육/짬뽕 등. 발렛파킹 가능, 소규모 가족모임 가능", "instagram": "https://www.instagram.com/dobomapo/p/DShiRg-CR-x/", "date": "2025.12.21", "closed": false}, {"id": 75, "title": "의정부 부대찌개", "station": "망원", "category": "음식점", "zone": "mangwon", "lat": 37.55507, "lng": 126.91344, "hours": "11:30-21:30 (15-17 브레이크 / 토,일 휴무)", "addr": "월드컵로10길 36", "description": "도보마포 부대찌개 원툴, 쑥갓과 파, 얼큰하고 고소한 부대찌개. 뚜껑 열지 말 것", "instagram": "https://www.instagram.com/dobomapo/p/DSXBh4fCUzD/", "date": "2025.12.17", "closed": false}, {"id": 76, "title": "로잉커피바", "station": "망원", "category": "카페", "zone": "mangwon", "lat": 37.55556, "lng": 126.90209, "hours": "08:00-20:00 (월 휴무)", "addr": "망원로4길 23", "description": "로잉커피 확장 오픈, 1층 도보프렌들리 공간, @bebear_carpenter 나무 가구, 시나몬롤/쿠키 등 디저트", "instagram": "https://www.instagram.com/dobomapo/p/DSUeNneCZXX/", "date": "2025.12.16", "closed": false}, {"id": 77, "title": "세이브브루어스", "station": "대흥", "category": "카페", "zone": "seogangdae", "lat": 37.54423, "lng": 126.93939, "hours": "09:00-18:00 (토,일 10시 오픈 / 금 휴무)", "addr": "대흥로14길 14", "description": "스페셜티 커피, 블렌드 3-4개월마다 교체, 필터커피 5종 이상, 원두 100g 소분 구매 가능", "instagram": "https://www.instagram.com/dobomapo/p/DSREaXoiX_I/", "date": "2025.12.15", "closed": false}, {"id": 78, "title": "코토베이커리", "station": "마포구청", "category": "카페", "zone": "mangwon", "lat": 37.55741, "lng": 126.89981, "hours": "10:00-17:00 (수,목 휴무)", "addr": "망원로1길 6", "description": "2025년 11월 오픈, 바게트/캄파뉴/탕종식빵/호밀빵 등 20종, 꿀호두 인기", "instagram": "https://www.instagram.com/dobomapo/p/DSNDVuDCQav/", "date": "2025.12.13", "closed": false}, {"id": 79, "title": "카페 하흘", "station": "마포구청", "category": "카페", "zone": "mangwon", "lat": 37.56284, "lng": 126.9064, "hours": "07:00-17:00", "addr": "월드컵로32길 45", "description": "성산동 동네 사랑방 카페, 아침 7시 오픈, 블렌드/싱글원두, 편안한 분위기", "instagram": "https://www.instagram.com/dobomapo/p/DSKGaArieMh/", "date": "2025.12.12", "closed": false}, {"id": 80, "title": "지미지미", "station": "대흥", "category": "카페", "zone": "seogangdae", "lat": 37.54847, "lng": 126.93764, "hours": "11:00-22:00", "addr": "광성로6안길 21", "description": "COMPACT DISC PUB & CAFE EASY SOUND, MOD 서브컬처, 8090 국산스피커, 커피/알코올, 소장품 전시", "instagram": "https://www.instagram.com/dobomapo/p/DSHjhZ3iaFc/", "date": "2025.12.11", "closed": false}, {"id": 81, "title": "원조조박집 본관", "station": "마포", "category": "음식점", "zone": "gongdeok", "lat": 37.53913, "lng": 126.94439, "hours": "11:30-22:00 (15-17 브레이크 / 일 휴무)", "addr": "토정로 313-1", "description": "40년 노포, 조씨+박씨 부부, 도드람 한돈 목살/갈비살 돼지갈비, 시래기 된장국, 식혜 제공", "instagram": "https://www.instagram.com/dobomapo/p/DR_1Gy7CcVE/", "date": "2025.12.08", "closed": false}, {"id": 82, "title": "보스코에스프레소", "station": "대흥", "category": "카페", "zone": "seogangdae", "lat": 37.54785, "lng": 126.93955, "hours": "08:00-16:00 (토,일 9-17 / 화 휴무)", "addr": "광성로6길 56", "description": "경의선숲길 2.5평 작은 카페, 묵직한 산미의 에스프레소, 아침형 카페", "instagram": "https://www.instagram.com/dobomapo/p/DR8f6M7CQ5U/", "date": "2025.12.07", "closed": false}, {"id": 83, "title": "우동가조쿠 홍대점", "station": "홍대입구", "category": "음식점", "zone": "hongdae", "lat": 37.55816, "lng": 126.92411, "hours": "11:00-21:00 (15-17 브레이크)", "addr": "양화로19길 18", "description": "일본식 사누키 우동, 생면 쫄깃, 가쓰오부시 국물, 새우튀김, 유부초밥, 1인석 있음", "instagram": "https://www.instagram.com/dobomapo/p/DR1gxkPCe_X/", "date": "2025.12.04", "closed": false}, {"id": 84, "title": "홉스", "station": "상수", "category": "편집샵", "zone": "hapjeong", "lat": 37.54792, "lng": 126.92407, "hours": "14:00-20:00", "addr": "독막로 71 B1", "description": "10년째 운영, 어패럴 브랜드, 아메리칸/재패니즈 빈티지 감성, 응접실 컨셉 반지층 공간", "instagram": "https://www.instagram.com/dobomapo/p/DRrj91qCSOq/", "date": "2025.11.30", "closed": false}, {"id": 85, "title": "마포원조떡볶이", "station": "마포", "category": "음식점", "zone": "gongdeok", "lat": 37.54047, "lng": 126.9486, "hours": "08:30-21:00", "addr": "도화2길 3", "description": "판 떡볶이, 맵달한 맛, 물엿 쫀득함, 순대/오뎅국물/볶음밥, 현금만 가능", "instagram": "https://www.instagram.com/dobomapo/p/DRmEGyRiT8L/", "date": "2025.11.28", "closed": false}, {"id": 86, "title": "하츠코히", "station": "망원", "category": "카페", "zone": "mangwon", "lat": 37.56251, "lng": 126.90583, "hours": "12:00-20:00 (목 휴무)", "addr": "성미산로1길 32", "description": "하츠코이+코히, 성산동 사랑방 카페, 아메리칸 재패니즈 빈티지 감성, 메론소다/나폴리탄/야끼소바빵", "instagram": "https://www.instagram.com/dobomapo/p/DReVroCCXPL/", "date": "2025.11.25", "closed": false}, {"id": 87, "title": "김진환제과점", "station": "신촌", "category": "카페", "zone": "hongdae", "lat": 37.55487, "lng": 126.9325, "hours": "08:00-14:30 (일,월 휴무)", "addr": "와우산로32길 41", "description": "Since 1996, 30년 노포, 동경제과학교 졸업 김진환 사장, 우유식빵/밤식빵/아몬드소보로", "instagram": "https://www.instagram.com/dobomapo/p/DRbzAdACRdv/", "date": "2025.11.24", "closed": false}, {"id": 88, "title": "포그 (POG)", "station": "합정", "category": "음식점", "zone": "hapjeong", "lat": 37.54714, "lng": 126.91423, "hours": "11:00-21:00 (15-17:30 브레이크 / 월 휴무)", "addr": "독막로2길 34", "description": "피자도우 핫도그, 포그잭/포그맥/고등어피자 등, 400도 오븐에서 5-10분 조리, 경의선숲길에서 합정으로 이전", "instagram": "https://www.instagram.com/dobomapo/p/DRRbCa_CRO-/", "date": "2025.11.20", "closed": false}, {"id": 89, "title": "중화복춘 동교골드", "station": "홍대입구", "category": "음식점", "zone": "hongdae", "lat": 37.55906, "lng": 126.92103, "hours": "11:30-22:00 (15:40-17:00 브레이크 / 수 휴무)", "addr": "월드컵북로6길 42", "description": "프리미엄 중식당, 동파육/크림새우/전가복/복춘초마 등, 점심특선 있음", "instagram": "https://www.instagram.com/dobomapo/p/DRO5v-qiaH5/", "date": "2025.11.19", "closed": false}, {"id": 90, "title": "망원즉석우동", "station": "망원", "category": "음식점", "zone": "hongdae", "lat": 37.5573, "lng": 126.92106, "hours": "11:00-21:20 (일 휴무)", "addr": "동교로 83", "description": "20년 전통, 쫄깃한 면발, 다대기 국물, 쑥갓, 돈까스 함께 주문 추천", "instagram": "https://www.instagram.com/dobomapo/p/DRJ0h_uCd10/", "date": "2025.11.17", "closed": false}, {"id": 91, "title": "머쉬룸", "station": "가좌", "category": "기타", "zone": "hongdae", "lat": 37.56576, "lng": 126.92157, "hours": "11:00-20:00", "addr": "성미산로29길 39 2층", "description": "1인 미용실, 버섯 인테리어, 네이버 예약, 편안하고 조용한 분위기", "instagram": "https://www.instagram.com/dobomapo/p/DQ_dr-nib7w/", "date": "2025.11.13", "closed": false}, {"id": 92, "title": "코끼리분식", "station": "마포", "category": "음식점", "zone": "gongdeok", "lat": 37.54021, "lng": 126.94898, "hours": "09:30-21:00", "addr": "도화2길 3", "description": "1986년 창업 노포, 즉석떡볶이(슴슴한 맛), 순대/오뎅/볶음밥, 쌀떡 쫄깃", "instagram": "https://www.instagram.com/dobomapo/p/DQ6V1L6iYqK/", "date": "2025.11.11", "closed": false}, {"id": 93, "title": "오카이", "station": "망원", "category": "바·주점", "zone": "mangwon", "lat": 37.55557, "lng": 126.89944, "hours": "17:00-03:00", "addr": "희우정로 70", "description": "동네 술집, 매콤우삼겹 마제소바/육회/치킨 난반/얼큰소고기탕, 노모먼트 사장님 운영", "instagram": "https://www.instagram.com/dobomapo/p/DQ3tjE-icKF/", "date": "2025.11.10", "closed": false}, {"id": 94, "title": "캐피", "station": "대흥", "category": "카페", "zone": "seogangdae", "lat": 37.54642, "lng": 126.94323, "hours": "08:00-17:00 (월 휴무)", "addr": "백범로 16안길 15-1", "description": "Coffee to Happy, 덴마크 코펜하겐 프롤로그 커피 판매, 경의선숲길 뷰, 아침형 카페", "instagram": "https://www.instagram.com/dobomapo/p/DQtclNpCUwk/", "date": "2025.11.06", "closed": false}, {"id": 95, "title": "8eyes", "station": "망원", "category": "카페", "zone": "hongdae", "lat": 37.55886, "lng": 126.91285, "hours": "11:00-19:00 (현재 금,토,일 영업)", "addr": "성미산로 42 2층", "description": "브랜딩 에이전시 AURG 운영, 디자인/음악/커피/강아지 공간, 일본 건축 서적 컬렉션, 턴테이블", "instagram": "https://www.instagram.com/dobomapo/p/DQoXLnSCVUw/", "date": "2025.11.04", "closed": false}, {"id": 96, "title": "늘잇", "station": "마포", "category": "음식점", "zone": "gongdeok", "lat": 37.54098, "lng": 126.94949, "hours": "17:00-24:00 (토 18시 오픈 / 일 휴무)", "addr": "도화길 22-6", "description": "일식 단품 요리+니혼슈 잔술, 금태구이/모듬회/게내장파스타/굴튀김, 예약 필수", "instagram": "https://www.instagram.com/dobomapo/p/DQY0OwkCbVL/", "date": "2025.10.29", "closed": false}, {"id": 97, "title": "작은평화망원", "station": "망원", "category": "기타", "zone": "mangwon", "lat": 37.55723, "lng": 126.90301, "hours": "12:00-22:00 (월 휴무)", "addr": "망원로 62", "description": "100% 예약제 무인 운영 공유서재, 셀프바 커피/차, 노트북 작업 가능, 예약 필수", "instagram": "https://www.instagram.com/dobomapo/p/DQWff1BCfQV/", "date": "2025.10.28", "closed": false}, {"id": 98, "title": "호미베어", "station": "망원", "category": "편집샵", "zone": "mangwon", "lat": 37.55715, "lng": 126.90813, "hours": "13:00-20:00", "addr": "동교로9길 83", "description": "남성 빈티지샵, 아메리칸+재패니즈 캐주얼, 밀리터리/캐주얼, 엔/나나미카/저널스탠다드 등", "instagram": "https://www.instagram.com/dobomapo/p/DQQPLEMElSN/", "date": "2025.10.26", "closed": false}, {"id": 99, "title": "동일루", "station": "망원", "category": "음식점", "zone": "mangwon", "lat": 37.55356, "lng": 126.90582, "hours": "12:00-22:00 (토,일 22:30까지)", "addr": "포은로 75", "description": "30년 노포 중식당, 수요미식회/생활의 달인 출연, 짬뽕(해산물 풍성)/탕수육(부어져 나오나 바삭)", "instagram": "https://www.instagram.com/dobomapo/p/DQJfTuxCcTb/", "date": "2025.10.23", "closed": false}, {"id": 100, "title": "환대커피워크", "station": "대흥", "category": "카페", "zone": "seogangdae", "lat": 37.54626, "lng": 126.93955, "hours": "10:00-20:00 (일 휴무)", "addr": "독막로34길 4-4", "description": "Come as you are 컨셉, 파니니/커피, 경의선숲길 인근, 사장님 부부 친절", "instagram": "https://www.instagram.com/dobomapo/p/DQDkTzoiRj2/", "date": "2025.10.21", "closed": false}, {"id": 101, "title": "네르", "station": "망원", "category": "카페", "zone": "mangwon", "lat": 37.55631, "lng": 126.91179, "hours": "12:00-19:00 (영업시간 계정 참고)", "addr": "월드컵로19길 25-1 4층", "description": "광주 출신 커피, 망원동 루프탑, 넬드립 약볶음~강볶음, 카페오레, 원두 판매, 혼자 운영", "instagram": "https://www.instagram.com/dobomapo/p/DP8adr6CQ3v/", "date": "2025.10.18", "closed": false}, {"id": 102, "title": "쿳사", "station": "홍대입구", "category": "카페", "zone": null, "lat": 37.57218, "lng": 126.92939, "hours": "월화수 09-18 / 목금 09-21 / 토일 08-21", "addr": "증가로 48", "description": "연중무휴, 호주식 브런치, 계절 제철 메뉴, 네이버 예약 가능, 넓은 공간", "instagram": "https://www.instagram.com/dobomapo/p/DP3VYrAiWIY/", "date": "2025.10.16", "closed": false}, {"id": 103, "title": "을밀대", "station": "공덕", "category": "음식점", "zone": "seogangdae", "lat": 37.54748, "lng": 126.94548, "hours": "11:00-22:00", "addr": "숭문길 24", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/DBrVWMnpKkP/", "date": "2025.10.14", "closed": false}, {"id": 104, "title": "산청엔흑돼지", "station": "망원", "category": "음식점", "zone": "hapjeong", "lat": 37.54966, "lng": 126.90864, "hours": "11:30-22:00 (2,4번째 월요일 휴무)", "addr": "포은로 110", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/DBov8GxJC4G/", "date": "2025.10.13", "closed": false}, {"id": 105, "title": "미식가주택", "station": "상수", "category": "바·주점", "zone": "hapjeong", "lat": 37.54661, "lng": 126.92286, "hours": "18:00-24:00 (토,일 17-23)", "addr": "와우산로 15-5", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/DBjYR-ipOQ_/", "date": "2025.10.11", "closed": false}, {"id": 106, "title": "오이소", "station": "가좌", "category": "음식점", "zone": "hongdae", "lat": 37.56622, "lng": 126.91685, "hours": "10:00-22:00 (일 휴무)", "addr": "성미산로17길 105", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/DAzOx2hJ4s9/", "date": "2025.09.30", "closed": false}, {"id": 107, "title": "이치젠", "station": "망원", "category": "음식점", "zone": "mangwon", "lat": 37.55796, "lng": 126.90362, "hours": "12:00-21:00 (15:00-17:30 브레이크 / 일 17:00까지)", "addr": "포은로 109", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/DAvVbeopH6s/", "date": "2025.09.28", "closed": false}, {"id": 108, "title": "대전해장국", "station": "신촌", "category": "음식점", "zone": "seogangdae", "lat": 37.55563, "lng": 126.9405, "hours": "15:00-24:00", "addr": "고산7길 25", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/DArO2PCJQAT/", "date": "2025.09.26", "closed": false}, {"id": 109, "title": "쏘블루", "station": "홍대입구", "category": "편집샵", "zone": null, "lat": 37.56986, "lng": 126.93106, "hours": "12:00-20:00 (월,화 휴무)", "addr": "증가로 27", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/DAoykfdpILr/", "date": "2025.09.25", "closed": false}, {"id": 110, "title": "수더분", "station": "공덕", "category": "카페", "zone": "gongdeok", "lat": 37.54525, "lng": 126.94703, "hours": "10:30-19:30 (일,월 휴무)", "addr": "백범로 152", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/DAmZPxpJiC9/", "date": "2025.09.24", "closed": false}, {"id": 111, "title": "노가리와 호프", "station": "망원", "category": "바·주점", "zone": "hongdae", "lat": 37.55553, "lng": 126.91899, "hours": "16:00-24:00 (그때그때다름)", "addr": "동교로 63", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/DAkOIyrJbzM/", "date": "2025.09.23", "closed": false}, {"id": 112, "title": "콘디스코", "station": "합정", "category": "카페", "zone": "hongdae", "lat": 37.56167, "lng": 126.92495, "hours": "11:00-20:30 (화 휴무)", "addr": "동교로 137", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/DAh8gf9JzTX/", "date": "2025.09.22", "closed": false}, {"id": 113, "title": "일랑비어하우스", "station": "망원", "category": "바·주점", "zone": "hapjeong", "lat": 37.54885, "lng": 126.90821, "hours": "17:00-24:00", "addr": "희우정로 10길 3", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/DAc_k8RpvYU/", "date": "2025.09.20", "closed": false}, {"id": 114, "title": "이해", "station": "홍대입구", "category": "카페", "zone": "hongdae", "lat": 37.56334, "lng": 126.92144, "hours": "08:00-19:00", "addr": "성미산로 67", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/DAaXUhxJ2LX/", "date": "2025.09.19", "closed": false}, {"id": 115, "title": "호짜", "station": "가좌", "category": "음식점", "zone": null, "lat": 37.57668, "lng": 126.92748, "hours": "12:00-22:00 (수 휴무 / 15-17 브레이크)", "addr": "모래내로 263", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/DAXuP6-pOiJ/", "date": "2025.09.18", "closed": false}, {"id": 116, "title": "연고지", "station": "마포", "category": "음식점", "zone": "gongdeok", "lat": 37.53917, "lng": 126.94489, "hours": "11:30-23:00 (15-16:30 브레이크)", "addr": "토정로 286-1", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/DATPfqGJoV1/", "date": "2025.09.16", "closed": false}, {"id": 117, "title": "고미태", "station": "망원", "category": "음식점", "zone": "hapjeong", "lat": 37.55291, "lng": 126.91156, "hours": "12:00-20:30 (14:30-17:30 브레이크 / 일 휴무)", "addr": "월드컵로 41", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/DAPUAHcpMiI/", "date": "2025.09.15", "closed": false}, {"id": 118, "title": "명성양꼬치", "station": "신촌", "category": "음식점", "zone": null, "lat": 37.55778, "lng": 126.93845, "hours": "15:00-23:00", "addr": "연세로4길 33", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/DAKbsMQpzJT/", "date": "2025.09.10", "closed": false}, {"id": 119, "title": "성미산알루", "station": "망원", "category": "바·주점", "zone": "mangwon", "lat": 37.56218, "lng": 126.90613, "hours": "18:00-24:00", "addr": "성미산로1길 29", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/DAF0d5ppISN/", "date": "2025.09.08", "closed": false}, {"id": 120, "title": "부빙", "station": "홍대입구", "category": "카페", "zone": "hongdae", "lat": 37.5628, "lng": 126.92652, "hours": "13:00-20:00 (월 휴무)", "addr": "성미산로 155", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/DADYqGqpALq/", "date": "2025.09.07", "closed": false}, {"id": 121, "title": "뭍", "station": "가좌", "category": "카페", "zone": null, "lat": 37.5761, "lng": 126.92327, "hours": "11:00-19:00 (토,일 12시 오픈 / 목 휴무)", "addr": "가재울로6길 53-53", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/DAA3PZEJUuO/", "date": "2025.09.06", "closed": false}, {"id": 122, "title": "덴마크서재", "station": "망원", "category": "편집샵", "zone": "mangwon", "lat": 37.55834, "lng": 126.90342, "hours": "금~일 12:00-19:00", "addr": "포은로 61", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/D_-hWTUpM2M/", "date": "2025.09.05", "closed": false}, {"id": 123, "title": "국일순대국", "station": "홍대입구", "category": "음식점", "zone": "hongdae", "lat": 37.55706, "lng": 126.91748, "hours": "11:00-21:00 (15-17:30 브레이크 / 토,일 휴무)", "addr": "월드컵북로5길 22", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/D_8JvS3p_Ac/", "date": "2025.09.04", "closed": false}, {"id": 124, "title": "영광보쌈", "station": "공덕", "category": "음식점", "zone": "gongdeok", "lat": 37.54669, "lng": 126.95415, "hours": "11:30-21:20 (14-17 브레이크 / 일 휴무)", "addr": "만리재로 1길 14", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/D_5u2u1pVTe/", "date": "2025.09.03", "closed": false}, {"id": 125, "title": "까페여름", "station": "가좌", "category": "카페", "zone": null, "lat": 37.5764, "lng": 126.92362, "hours": "월-목 13:00-19:00 / 토-일 12:00-18:00 (금 휴무)", "addr": "가재울로 6길 53-3", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/D_svICxJiaq/", "date": "2025.08.29", "closed": false}, {"id": 126, "title": "오코노미야끼골드", "station": "마포구청", "category": "음식점", "zone": "mangwon", "lat": 37.56045, "lng": 126.90397, "hours": "17:00-25:00 (수 휴무)", "addr": "방울내로 67", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/D_nqJ9wpFdh/", "date": "2025.08.27", "closed": false}, {"id": 127, "title": "아이오밀", "station": "대흥", "category": "음식점", "zone": "seogangdae", "lat": 37.54656, "lng": 126.94275, "hours": "11:00-21:00 (15-17:30 브레이크)", "addr": "백범로16안길 15-1 2층", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/D_iPq8uJz3t/", "date": "2025.08.25", "closed": false}, {"id": 128, "title": "한담", "station": "합정", "category": "음식점", "zone": "hapjeong", "lat": 37.55247, "lng": 126.91412, "hours": "17:00-24:00", "addr": "양화로7길 49", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/D_YJg0RpVL1/", "date": "2025.08.21", "closed": false}, {"id": 129, "title": "킷사코이", "station": "대흥", "category": "바·주점", "zone": "seogangdae", "lat": 37.54956, "lng": 126.94016, "hours": "17:00-24:00 (월 휴무)", "addr": "독막로 250-1", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/D_TSKAFpC6I/", "date": "2025.08.19", "closed": false}, {"id": 130, "title": "발츠", "station": "홍대입구", "category": "편집샵", "zone": null, "lat": 37.56811, "lng": 126.93038, "hours": "13:00-20:00", "addr": "연희맛로 17-18 3층", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/D_QlSNGpJYv/", "date": "2025.08.18", "closed": false}, {"id": 131, "title": "팀리 커피로스터스", "station": "이대", "category": "카페", "zone": "seogangdae", "lat": 37.55283, "lng": 126.94501, "hours": "평일 09-20 / 토,일 10-19 / 화 휴무", "addr": "고산18길 6", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/D_OGHoip8BN/", "date": "2025.08.17", "closed": false}, {"id": 132, "title": "산스밀스", "station": "가좌", "category": "음식점", "zone": null, "lat": 37.57504, "lng": 126.92925, "hours": "11:00-17:00 (토,일 18시까지 / 월,화 휴무)", "addr": "홍연4길 33", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/D_G9YFOJK6D/", "date": "2025.08.12", "closed": false}, {"id": 133, "title": "츠부카레", "station": "망원", "category": "음식점", "zone": "hongdae", "lat": 37.55507, "lng": 126.91652, "hours": "11:00-21:00 (16-17 브레이크 / 일 휴무)", "addr": "동교로 40", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/D-3ZXwzJl0I/", "date": "2025.08.07", "closed": false}, {"id": 134, "title": "육도", "station": "마포", "category": "음식점", "zone": "gongdeok", "lat": 37.53975, "lng": 126.94339, "hours": "16:00-22:30 (일 휴무)", "addr": "토정로 261", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/D-xvPOfpRNf/", "date": "2025.08.05", "closed": false}, {"id": 135, "title": "피피커피", "station": "망원", "category": "카페", "zone": "mangwon", "lat": 37.5539, "lng": 126.91061, "hours": "09:00-19:00 (월 휴무)", "addr": "동교로 23", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/D-vOPK4JpHI/", "date": "2025.08.03", "closed": false}, {"id": 136, "title": "타라이", "station": "홍대입구", "category": "음식점", "zone": null, "lat": 37.57012, "lng": 126.92751, "hours": "10:00-18:00 (금,토,일 19시 종료 / 수 휴무)", "addr": "연희로11길 45-21", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/D-nA4lKJJXw/", "date": "2025.07.31", "closed": false}, {"id": 137, "title": "롱앤쇼트", "station": "공덕", "category": "카페", "zone": null, "lat": 37.5674, "lng": 126.92872, "hours": "월-금 09:00-17:30 / 토,일 09:30-18:00", "addr": "홍제내2나길 46", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/D-g0u3XJ_Kp/", "date": "2025.07.27", "closed": false}, {"id": 138, "title": "도월리가", "station": "마포구청", "category": "음식점", "zone": "mangwon", "lat": 37.55993, "lng": 126.90253, "hours": "화-금 11:00-21:00 / 토,일 12:00-20:00 (월 휴무 / 15:30-17:30 브레이크)", "addr": "방울내로 57", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/D-Y4o-TJFhL/", "date": "2025.07.23", "closed": false}, {"id": 139, "title": "쓰리고카페", "station": "망원", "category": "카페", "zone": "mangwon", "lat": 37.55531, "lng": 126.89982, "hours": "월-금 07:00-22:00 / 토,일 09:00-22:00", "addr": "희우정로91", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/DMXkJyyJleI/", "date": "2025.07.21", "closed": false}, {"id": 140, "title": "고주파", "station": "대흥", "category": "바·주점", "zone": "seogangdae", "lat": 37.54846, "lng": 126.93889, "hours": "17:00-24:00", "addr": "광성로6길 28", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/DMFrc4XJVXf/", "date": "2025.07.14", "closed": false}, {"id": 141, "title": "시노라 연희", "station": "홍대입구", "category": "카페", "zone": null, "lat": 37.56412, "lng": 126.93343, "hours": "10:00-18:00 (월 휴무)", "addr": "연희로 16길 7-15", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/DMCIek2JWXS/", "date": "2025.07.13", "closed": false}, {"id": 142, "title": "돈까스광명", "station": "합정", "category": "음식점", "zone": "hapjeong", "lat": 37.55041, "lng": 126.90825, "hours": "11:30-20:00 (14:30-17:30 브레이크 / 일 15시까지 / 월 휴무)", "addr": "포은로 25", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/DL9tandpElH/", "date": "2025.07.11", "closed": false}, {"id": 143, "title": "느리네", "station": "상수", "category": "바·주점", "zone": "hapjeong", "lat": 37.54601, "lng": 126.92228, "hours": "18:30-03:30 (월 휴무)", "addr": "와우산로3길 13", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/DL2L_rspfOv/", "date": "2025.07.08", "closed": false}, {"id": 144, "title": "헷키", "station": "가좌", "category": "카페", "zone": null, "lat": 37.57617, "lng": 126.92474, "hours": "12:00-18:00 (목,금 휴무)", "addr": "가재울로4길 62", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/DLza2drJ4lV/", "date": "2025.07.07", "closed": false}, {"id": 145, "title": "죠티레스토랑", "station": "신촌", "category": "음식점", "zone": "seogangdae", "lat": 37.55495, "lng": 126.93797, "hours": "11:00-22:00", "addr": "신촌로20길 6 3층", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/DLpAonwJFhF/", "date": "2025.07.03", "closed": false}, {"id": 146, "title": "오자서울", "station": "홍대입구", "category": "편집샵", "zone": null, "lat": 37.56727, "lng": 126.92764, "hours": "13:00-19:00 (월,화 휴무)", "addr": "연희로11가길 24 3층", "description": "구 오자크래프트", "instagram": "https://www.instagram.com/dobomapo/p/DLcGyCduTPu/", "date": "2025.06.28", "closed": false}, {"id": 147, "title": "비스퀴테리산", "station": "마포구청", "category": "카페", "zone": "hongdae", "lat": 37.56563, "lng": 126.91176, "hours": "10:00-16:00 (화,수,목 휴무)", "addr": "월드컵북로 121-8", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/DLZiUDFJ4o3/", "date": "2025.06.27", "closed": false}, {"id": 148, "title": "물루", "station": "망원", "category": "카페", "zone": "mangwon", "lat": 37.55734, "lng": 126.91119, "hours": "09:00-20:00", "addr": "성미산로6길 8", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/DLW9aahJ5wc/", "date": "2025.06.26", "closed": false}, {"id": 149, "title": "포튼가먼트", "station": "합정", "category": "기타", "zone": "hapjeong", "lat": 37.54895, "lng": 126.9196, "hours": "11:00-20:30 (토일 20시까지 / 월 휴무)", "addr": "독막로9길 11", "description": "맞춤정장 브랜드", "instagram": "https://www.instagram.com/dobomapo/p/DLPyL1vJlQK/", "date": "2025.06.23", "closed": false}, {"id": 150, "title": "러프글로스", "station": "홍대입구", "category": "편집샵", "zone": null, "lat": 37.5674, "lng": 126.92828, "hours": "12:00-18:00", "addr": "연희로 15길 91-17", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/DLKX3HxJ9Y7/", "date": "2025.06.21", "closed": false}, {"id": 151, "title": "스몰로우", "station": "가좌", "category": "카페", "zone": "hongdae", "lat": 37.56536, "lng": 126.91679, "hours": "08:00-17:00 (월 휴무)", "addr": "연남로11길 40", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/DLGZhHVzLCf/", "date": "2025.06.20", "closed": false}, {"id": 152, "title": "보울리", "station": "망원", "category": "카페", "zone": "mangwon", "lat": 37.55423, "lng": 126.90857, "hours": "11:00-20:30 (월 휴무)", "addr": "월드컵로11길 67", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/DLCpsRYpAeb/", "date": "2025.06.18", "closed": false}, {"id": 153, "title": "하우스키루", "station": "홍대입구", "category": "카페", "zone": "hongdae", "lat": 37.56358, "lng": 126.92184, "hours": "11:00-23:00 (토,일 10시 오픈)", "addr": "성미산로 174", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/DK9cfxUptta/", "date": "2025.06.16", "closed": false}, {"id": 154, "title": "쓰리리틀피그스", "station": "홍대입구", "category": "편집샵", "zone": null, "lat": 37.56969, "lng": 126.92778, "hours": "12:00-18:00 (일,월 휴무)", "addr": "연희로11바길 5", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/DK10oPSpK75/", "date": "2025.06.13", "closed": false}, {"id": 155, "title": "스테디에브리웨어", "station": "홍대입구", "category": "편집샵", "zone": "hongdae", "lat": 37.56047, "lng": 126.92051, "hours": "13:00-19:00 (일,월 휴무 / 토 20시까지)", "addr": "연남로3길 26", "description": "", "instagram": "https://www.instagram.com/dobomapo/p/DKwXJeVpseZ/", "date": "2025.06.11", "closed": false}];
+
+/* ──────────────────────────────────────────────────────────
+   MAP INIT
+   ────────────────────────────────────────────────────────── */
+let map, markersLayer, stationLayer, zoneLayer;
+let activeZone = 'all', activeCat = 'all', searchQuery = '';
+let showZones = true, showSubway = true;   // 지도 우측 토글 상태
+
+function initMap() {
+  // 마포구 경계 bbox (패딩 포함)
+  const MAPO_BOUNDS = L.latLngBounds(
+    [37.51, 126.84],  // SW
+    [37.61, 126.98]   // NE
+  );
+
+  map = L.map('map', {
+    center: [37.5580, 126.9140],
+    zoom: 13,
+    zoomControl: false,    // 기본 왼쪽 컨트롤 끄고 오른쪽에 직접 추가
+    minZoom: window.innerWidth <= 640 ? 12 : 13,  // 데스크톱=13(기존), 모바일(좁은 화면)만 12까지 허용
+    maxZoom: 19,
+    maxBounds: MAPO_BOUNDS,
+    maxBoundsViscosity: 1.0
+  });
+
+  // 줌 컨트롤 오른쪽 상단에 배치
+  L.control.zoom({ position: 'topright' }).addTo(map);
+
+  // CartoDB Positron (clean light basemap)
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/">CARTO</a>',
+    subdomains: 'abcd',
+    maxZoom: 19
+  }).addTo(map);
+
+  // 콘텐츠 마커: 클러스터 그룹 (줌아웃=묶음+개수, 줌인=개별 핀). 모든 줌에서 표시.
+  markersLayer = L.markerClusterGroup({
+    maxClusterRadius: 50,
+    showCoverageOnHover: false,
+    spiderfyOnMaxZoom: true,
+    disableClusteringAtZoom: 19,  // 최대 줌에선 개별 핀으로 분리
+
+    iconCreateFunction: function (cluster) {
+      const n = cluster.getChildCount();
+      const size = n < 10 ? 34 : n < 30 ? 40 : 46;
+      return L.divIcon({
+        html: `<div style="width:${size}px;height:${size}px;border-radius:50%;background:#9B1C20;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.35);">${n}</div>`,
+        className: '', iconSize: [size, size],
+      });
+    },
+  }).addTo(map);
+
+  map.on('zoomend', updateLayersByZoom);  // 줌 변경 시 권역명 ↔ 지하철역 전환
+
+  // ── 마포구 외 전체 역마스크 (좌표 직접 embed → 즉시 렌더링) ──
+  // 출처: OSM relation 2419949, Overpass + Douglas-Peucker(ε=0.0002), 88점
+  const MAPO_LATLNG = [[37.54076,126.95658],[37.54071,126.95652],[37.54061,126.95664],[37.53947,126.95573],[37.53918,126.95519],[37.53893,126.9541],[37.53834,126.95365],[37.53751,126.95337],[37.53654,126.95155],[37.53629,126.95128],[37.5361,126.9506],[37.53605,126.94991],[37.53574,126.94899],[37.53558,126.94879],[37.53562,126.94785],[37.53582,126.94748],[37.53538,126.94738],[37.5353,126.94748],[37.53522,126.94738],[37.53537,126.94718],[37.53558,126.94652],[37.53574,126.94641],[37.53569,126.94627],[37.53518,126.94544],[37.53498,126.94556],[37.53497,126.9451],[37.53452,126.94482],[37.53423,126.94493],[37.53377,126.94458],[37.53423,126.94422],[37.53446,126.94386],[37.53445,126.94371],[37.53458,126.94367],[37.53784,126.93856],[37.54053,126.9329],[37.54136,126.93033],[37.53908,126.92766],[37.53913,126.92729],[37.53904,126.92711],[37.53975,126.92483],[37.54045,126.92309],[37.54063,126.92283],[37.54143,126.92242],[37.54142,126.90484],[37.5441,126.9022],[37.54502,126.90182],[37.54801,126.89894],[37.54939,126.89468],[37.55221,126.88826],[37.55309,126.88683],[37.5599,126.87329],[37.56198,126.869],[37.563,126.86624],[37.56438,126.86397],[37.5702,126.85488],[37.57179,126.85363],[37.5738,126.85363],[37.57492,126.85929],[37.57524,126.85929],[37.57747,126.86494],[37.57752,126.86838],[37.57801,126.8706],[37.57828,126.87392],[37.57818,126.87626],[37.57896,126.87626],[37.57887,126.87707],[37.57955,126.87761],[37.57977,126.87768],[37.58011,126.87742],[37.58031,126.87751],[37.58062,126.87747],[37.58126,126.87666],[37.58138,126.87663],[37.58163,126.87667],[37.58221,126.87705],[37.58289,126.8771],[37.58339,126.87699],[37.58405,126.87733],[37.58424,126.87716],[37.58416,126.87662],[37.58444,126.87654],[37.58494,126.87719],[37.58557,126.87727],[37.58625,126.87754],[37.58637,126.87847],[37.58677,126.87913],[37.58787,126.87944],[37.58951,126.88035],[37.59054,126.88199],[37.59064,126.88189],[37.59079,126.88206],[37.58718,126.88573],[37.58474,126.88869],[37.58141,126.89409],[37.57292,126.90671],[37.57192,126.90805],[37.5713,126.90909],[37.57123,126.90908],[37.57083,126.90981],[37.57064,126.91031],[37.57077,126.91025],[37.57024,126.91155],[37.56818,126.91589],[37.56716,126.91844],[37.56671,126.92012],[37.5665,126.92155],[37.56572,126.92473],[37.56515,126.92602],[37.56467,126.9267],[37.56338,126.92828],[37.56111,126.92677],[37.56083,126.92669],[37.55885,126.92659],[37.55691,126.93189],[37.55677,126.93186],[37.55674,126.93194],[37.55687,126.93199],[37.5551,126.93686],[37.55654,126.94137],[37.55741,126.95619],[37.55724,126.95913],[37.55766,126.95964],[37.55749,126.95979],[37.55751,126.95991],[37.55795,126.96045],[37.55761,126.96017],[37.55764,126.96026],[37.5587,126.96116],[37.55882,126.96116],[37.55908,126.96163],[37.55883,126.96174],[37.55862,126.96154],[37.55842,126.96156],[37.55845,126.96207],[37.55806,126.96281],[37.55822,126.9631],[37.55741,126.96305],[37.55732,126.96322],[37.55686,126.96343],[37.55603,126.96276],[37.55612,126.96262],[37.556,126.96274],[37.5559,126.96246],[37.55553,126.96213],[37.55514,126.96202],[37.55525,126.962],[37.555,126.96174],[37.55479,126.96173],[37.55402,126.96208],[37.55403,126.96201],[37.55278,126.96231],[37.55189,126.96229],[37.55155,126.96244],[37.55148,126.96236],[37.55066,126.96319],[37.55004,126.96355],[37.54994,126.96351],[37.54975,126.9639],[37.54925,126.9637],[37.54876,126.96374],[37.54864,126.96334],[37.54862,126.96224],[37.54813,126.96223],[37.54759,126.96171],[37.54742,126.96108],[37.54636,126.96013],[37.54607,126.96005],[37.54597,126.95953],[37.54605,126.95934],[37.54574,126.95897],[37.5455,126.95842],[37.54545,126.95791],[37.54514,126.95782],[37.54442,126.95811],[37.54422,126.95758],[37.54401,126.95746],[37.5437,126.95754],[37.54321,126.95742],[37.54297,126.95758],[37.54291,126.95809],[37.54276,126.95835],[37.54231,126.95818],[37.54164,126.95699],[37.54114,126.95685],[37.54076,126.95658]];
+
+  // ── 마포구 마스크 & 경계선 ────────────────────────────────
+  // padding: 2 → 뷰포트 200% 여백까지 미리 렌더링 → 이동 시 재계산 없음
+  const preRenderer = L.svg({ padding: 2 });
+  const worldRing   = [[-90,-180],[-90,180],[90,180],[90,-180]];
+
+  L.polygon([worldRing, MAPO_LATLNG], {
+    renderer: preRenderer,
+    stroke: false,
+    fillColor: '#9B1C20',
+    fillOpacity: 0.10,
+    interactive: false
+  }).addTo(map);
+  // 마포구 빨간 외곽선은 제거 — 6개 권역 폴리곤 테두리가 외곽을 대신함 (마스크는 유지)
+
+  renderMarkers(CONTENTS);
+  renderList(CONTENTS);
+}
+
+// 카테고리별 색상 (지도 마커·필터 pill·카드 공통)
+const CATEGORY_COLOR = {
+  '음식점': '#E8552D',  // 주황빨강
+  '카페':   '#B07A3C',  // 브라운
+  '바·주점': '#7C3AED',  // 퍼플
+  '편집샵': '#0E9488',  // 틸
+  '기타':   '#6B7280',  // 그레이
+};
+function catColor(cat) { return CATEGORY_COLOR[cat] || '#9B1C20'; }
+
+// 카테고리별 아이콘(SVG path). 음식점=수저, 카페=커피잔, 바·주점=와인잔, 편집샵=쇼핑백, 기타=핀
+const CAT_GLYPH = {
+  '음식점': '<path d="M3 2v7c0 1.1.9 2 2 2h2c1.1 0 2-.9 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/>',
+  '카페':   '<path d="M10 2v2"/><path d="M14 2v2"/><path d="M6 2v2"/><path d="M17 9H4a1 1 0 0 0-1 1v7a4 4 0 0 0 4 4h6a4 4 0 0 0 4-4h1a3 3 0 0 0 0-6h-1Z"/>',
+  '바·주점': '<path d="M8 22h8"/><path d="M12 15v7"/><path d="M12 15a5 5 0 0 0 5-5c0-2-.5-4-1-8H8c-.5 4-1 6-1 8a5 5 0 0 0 5 5Z"/>',
+  '편집샵': '<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/>',
+  '기타':   '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/>',
+};
+function catGlyph(cat) { return CAT_GLYPH[cat] || CAT_GLYPH['기타']; }
+
+function brandIcon(category) {
+  const c = catColor(category);
+  // 흰 원 + 카테고리 아이콘(그림). 클릭 영역 34px(투명) 유지
+  return L.divIcon({
+    className: '',
+    html: `<div style="width:34px;height:34px;display:flex;align-items:center;justify-content:center;">`
+        + `<div style="width:25px;height:25px;border-radius:50%;background:#fff;border:1.5px solid ${c};box-shadow:0 1px 4px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;">`
+        + `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="${c}" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">${catGlyph(category)}</svg>`
+        + `</div></div>`,
+    iconSize: [34, 34],
+    iconAnchor: [17, 17],
+    popupAnchor: [0, -14]
+  });
+}
+
+function catEmoji(cat) {
+  const map = { '음식점':'🍽', '카페':'☕', '바·주점':'🍶', '편집샵':'🛍', '기타':'📍' };
+  return map[cat] || '📍';
+}
+
+function renderMarkers(items) {
+  markersLayer.clearLayers();
+  items.forEach(item => {
+    const marker = L.marker([item.lat, item.lng], { icon: brandIcon(item.category) });
+    marker._contentId = item.id;
+    // 고립된(클러스터에 안 묶인) 마커만 이름 라벨 노출. 클러스터된 마커는 개별 렌더 안 되어 라벨도 숨겨짐.
+    marker.bindTooltip(`<span class="mkl">${item.title}</span>`, { permanent: true, direction: 'bottom', offset: [0, 15], className: 'mk-label', opacity: 1, interactive: true });
+    marker.bindPopup(`
+      <div style="min-width:200px;max-width:260px;">
+        <div class="popup-cat"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${catColor(item.category)};margin-right:5px;vertical-align:middle;"></span>${item.category}</div>
+        <div class="popup-title">${item.title}</div>
+        <div class="popup-dong" style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+          <span>${item.station}역</span>
+          ${lineBadgesHTML(STATION_DATA.find(s=>s.value===item.station)?.lines||[])}
+        </div>
+        ${item.addr ? `<div class="popup-dong" style="margin-bottom:3px;">📍 ${item.addr}</div>` : ''}
+        ${item.hours ? `<div class="popup-dong" style="margin-bottom:6px;">🕒 ${item.hours}</div>` : ''}
+        <div class="popup-desc">${item.description}</div>
+        <a class="popup-insta" href="${item.instagram}" target="_blank">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="5"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/></svg>
+          콘텐츠 보기
+        </a>
+      </div>
+    `, { maxWidth: 280 });
+    marker.on('click', () => {
+      // 마커가 지도 중앙으로 오도록 이동 (팝업 높이 고려해 살짝 아래로 오프셋)
+      const px = map.project([item.lat, item.lng]);
+      px.y -= 80;
+      map.panTo(map.unproject(px), { animate: true, duration: 0.4 });
+      selectCard(item.id);
+    });
+    markersLayer.addLayer(marker);
+  });
+}
+
+function renderList(items) {
+  const list = document.getElementById('result-list');
+
+  const html = items.map(item => `
+    <div class="result-item" id="item-${item.id}" onclick="flyTo(${item.lat},${item.lng},${item.id})">
+      <div class="ri-top">
+        <span class="item-title">${item.title}</span>
+        <span class="ri-cat" style="color:${catColor(item.category)}">${item.category}</span>
+      </div>
+      <div class="ri-sub">${item.station ? item.station + '역' : ''}${item.addr ? ' · ' + item.addr : ''}</div>
+    </div>
+  `).join('');
+
+  list.innerHTML = `<div class="result-count">${items.length}개 장소</div>` +
+    (items.length ? html : '<div class="no-result">조건에 맞는 장소가 없어요.</div>');
+}
+
+function selectCard(id) {
+  document.querySelectorAll('.result-item').forEach(el => el.classList.remove('selected'));
+  const el = document.getElementById('item-' + id);
+  if (el) {
+    el.classList.add('selected');
+    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+}
+
+function flyTo(lat, lng, id) {
+  selectCard(id);
+  // id로 마커 탐색 (좌표 비교는 jitter/부동소수 때문에 실패할 수 있음)
+  let marker = null;
+  markersLayer.eachLayer(layer => { if (layer._contentId === id) marker = layer; });
+
+  const reveal = () => {
+    if (!map.hasLayer(markersLayer)) markersLayer.addTo(map);
+    if (marker && typeof markersLayer.zoomToShowLayer === 'function') {
+      // 클러스터에 묶여 있으면 펼친 뒤 팝업 오픈
+      markersLayer.zoomToShowLayer(marker, () => setTimeout(() => marker.openPopup(), 60));
+    } else if (marker) {
+      marker.openPopup();
+    }
+  };
+
+  if (map.getZoom() < STATION_ZOOM) {
+    // 줌아웃 상태: 콘텐츠 레이어가 숨겨져 있으므로 먼저 확대 → 레이어 표시 후 펼치기
+    map.setView([lat, lng], 16, { animate: true });
+    setTimeout(reveal, 700);
+  } else {
+    map.panTo([lat, lng], { animate: true, duration: 0.4 });
+    setTimeout(reveal, 350);
+  }
+}
+
+/* ──────────────────────────────────────────────────────────
+   권역 데이터
+   ────────────────────────────────────────────────────────── */
+const ZONE_DATA = [
+  { value: 'all',         label: '전체',       color: null,      stations: null },
+  { value: 'sangam',      label: '상암·DMC',   color: '#6366F1', stations: ['DMC', '월드컵경기장'] },
+  { value: 'mangwon',     label: '성산·망원',  color: '#D97706', stations: ['마포구청', '망원'] },
+  { value: 'hongdae',     label: '홍대',       color: '#EC4899', stations: ['홍대입구'] },
+  { value: 'hapjeong',    label: '합정·상수',  color: '#1D4ED8', stations: ['합정', '상수'] },
+  { value: 'seogangdae',  label: '서강대·대흥',color: '#059669', stations: ['서강대', '광흥창', '대흥'],
+    voronoiSeed: [37.5510, 126.9385] }, // 홍대와의 경계를 서강로9길 쪽(서강대역 포함)으로 당기기 위한 seed
+  { value: 'gongdeok',    label: '공덕·마포',  color: '#7C3AED', stations: ['공덕', '마포', '애오개'] },
+];
+
+
+/* ──────────────────────────────────────────────────────────
+   역 + 호선 데이터
+   ────────────────────────────────────────────────────────── */
+const STATION_DATA = [
+  { value: 'all',          label: '전체 역',       lines: [],                     lat: null,     lng: null },
+  { value: '홍대입구',     label: '홍대입구',      lines: ['2','경의','공항'],    lat: 37.55699,  lng: 126.92388 },
+  { value: '합정',         label: '합정',          lines: ['2','6'],              lat: 37.54938,  lng: 126.91372 },
+  { value: '상수',         label: '상수',          lines: ['6'],                  lat: 37.54776,  lng: 126.9229 },
+  { value: '광흥창',       label: '광흥창',        lines: ['6'],                  lat: 37.54746,  lng: 126.932 },
+  { value: '서강대',       label: '서강대',        lines: ['경의'],               lat: 37.5524,  lng: 126.9352 },
+  { value: '대흥',         label: '대흥',          lines: ['6'],                  lat: 37.5477,  lng: 126.9423 },
+  { value: '망원',         label: '망원',          lines: ['6'],                  lat: 37.55599,  lng: 126.91009 },
+  { value: '마포구청',     label: '마포구청',      lines: ['6'],                  lat: 37.56355,  lng: 126.90334 },
+  { value: '월드컵경기장', label: '월드컵경기장',  lines: ['6'],                  lat: 37.5702,  lng: 126.89929 },
+  { value: 'DMC',          label: 'DMC',           lines: ['6','경의','공항'],    lat: 37.57741,  lng: 126.89811 },
+  { value: '공덕',         label: '공덕',          lines: ['5','6','경의','공항'], lat: 37.54371,  lng: 126.95079 },
+  { value: '마포',         label: '마포',          lines: ['5'],                  lat: 37.53963,  lng: 126.94598 },
+  { value: '애오개',       label: '애오개',        lines: ['5'],                  lat: 37.55342,  lng: 126.95665 },
+  { value: '신촌',         label: '신촌',          lines: ['2'],                  lat: 37.55519,  lng: 126.93684 },
+  { value: '이대',         label: '이대',          lines: ['2'],                  lat: 37.55681,  lng: 126.9461 },
+  { value: '가좌',         label: '가좌',          lines: ['경의'],               lat: 37.56833,  lng: 126.91571 },
+];
+
+const LINE_CLASS = { '2':'lb-2', '5':'lb-5', '6':'lb-6', '경의':'lb-k', '공항':'lb-a' };
+const LINE_COLOR = { '2':'#009944', '5':'#996CAC', '6':'#CD7C2F', '경의':'#77C4A3', '공항':'#0090D2' };
+
+/// 역별 선로 세그먼트 — 인접역 좌표로 계산한 실제 선로 방향각
+// angle: CSS rotate(Ndeg), 0=수평(E-W), +시계방향
+const STATION_SEGMENTS = {
+  '홍대입구':     [{ lines:['2'],           angle: -37 },   // ← 합정(SW)
+                   { lines:['경의','공항'],  angle:  22 }],  // → 서강대(SE)
+  '합정':         [{ lines:['2'],           angle: -37 },   // ← 홍대(NE)
+                   { lines:['6'],           angle:  10 }],  // → 상수(E)
+  '상수':         [{ lines:['6'],           angle:   6 }],  // 합정↔광흥창 평균
+  '광흥창':       [{ lines:['6'],           angle:   1 }],  // 상수↔대흥 평균
+  '서강대':       [{ lines:['경의'],        angle:  26 }],  // 홍대↔공덕 평균
+  '대흥':         [{ lines:['6'],           angle:  12 }],  // 광흥창↔공덕 평균
+  '망원':         [{ lines:['6'],           angle:  49 }],  // → 마포구청(NW)
+  '마포구청':     [{ lines:['6'],           angle:  54 }],  // 망원↔월드컵 평균
+  '월드컵경기장': [{ lines:['6'],           angle:  70 }],  // 마포구청↔DMC 평균
+  'DMC':          [{ lines:['6'],           angle:  81 },   // ← 월드컵(SSE)
+                   { lines:['경의','공항'],  angle:  38 }],  // ↔ 홍대입구 방향
+  '공덕':         [{ lines:['5'],           angle: -41 },   // → 마포(SW)
+                   { lines:['6'],           angle:  25 },   // ← 대흥(W)
+                   { lines:['경의','공항'],  angle:  29 }],  // ← 서강대(NW)
+  '마포':         [{ lines:['5'],           angle: -47 }],  // 공덕↔애오개 평균
+  '애오개':       [{ lines:['5'],           angle: -52 }],  // ← 마포(NE)
+};
+
+function lineBadgesHTML(lines) {
+  if (!lines || !lines.length) return '';
+  return `<span class="line-badges">${
+    lines.map(l => `<span class="lb ${LINE_CLASS[l] || ''}">${l}</span>`).join('')
+  }</span>`;
+}
+
+/* ── 지하철 역 마커 (네이버 스타일) ── */
+
+// 역 마커: 흰 원형 + 노선색 테두리 + 역명 (네이버식). 환승역은 살짝 큼.
+function renderStationMarkers() {
+  // 역 마커 전용 pane — 콘텐츠 마커(markerPane 600)보다 아래로 두어 콘텐츠가 위에 오도록
+  if (!map.getPane('stationPane')) {
+    map.createPane('stationPane');
+    map.getPane('stationPane').style.zIndex = 550;
+    map.getPane('stationPane').style.pointerEvents = 'none';
+  }
+  if (stationLayer) stationLayer.remove();
+  stationLayer = L.layerGroup().addTo(map);
+  const showLabel = true;  // 역은 확대(STATION_ZOOM↑)에서만 보이므로 라벨 항상 표시
+  const SYM = { '2': '2', '5': '5', '6': '6', '경의': 'K', '공항': 'A' };  // 호선 표기 기호
+  STATION_DATA.filter(s => s.lat).forEach(s => {
+    const lines = s.lines || [];
+    // 호선색 원 + 호선번호 배지 (환승역은 여러 개를 가로로)
+    const badges = (lines.length ? lines : ['']).map(ln => {
+      const col = LINE_COLOR[ln] || '#888';
+      return `<div style="min-width:17px;height:17px;padding:0 2px;border-radius:4px;background:${col};border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;font-weight:800;line-height:1;">${SYM[ln] || ''}</div>`;
+    }).join('');
+    const label = showLabel
+      ? `<div style="position:absolute;left:0;top:13px;transform:translateX(-50%);font-size:11px;font-weight:700;color:#222;white-space:nowrap;text-shadow:0 0 3px #fff,0 0 3px #fff,0 1px 2px rgba(255,255,255,.9);">${s.label}역</div>`
+      : '';
+    // 배지 묶음의 중심이 역 좌표에 오도록 배치, 라벨은 아래
+    const html = `<div style="position:relative;width:0;height:0;">`
+      + `<div style="position:absolute;left:0;top:0;transform:translate(-50%,-50%);display:flex;gap:2px;">${badges}</div>`
+      + label + `</div>`;
+    L.marker([s.lat, s.lng], { icon: L.divIcon({ html, className: '', iconSize: [0, 0] }), pane: 'stationPane', interactive: false }).addTo(stationLayer);
+  });
+}
+
+/* ── 권역 이름 라벨 + 줌별 전환 (축소=권역명, 확대=지하철역) ── */
+let zoneLabelLayer = null;
+const STATION_ZOOM = 14;  // 이 줌 미만: 권역 이름만, 이상: 지하철역 표시
+// 권역 이름 위치 미세조정 [위도Δ, 경도Δ] (필요한 권역만)
+const ZONE_LABEL_OFFSET = { seogangdae: [0, -0.004], gongdeok: [0, -0.004], hongdae: [0, -0.004] };  // 이름 위치 왼쪽 보정
+
+function renderZoneLabels() {
+  if (!map.getPane('zoneLabelPane')) {
+    map.createPane('zoneLabelPane');
+    map.getPane('zoneLabelPane').style.zIndex = 560;
+    map.getPane('zoneLabelPane').style.pointerEvents = 'none';
+  }
+  if (zoneLabelLayer) zoneLabelLayer.remove();
+  zoneLabelLayer = L.layerGroup();
+  ZONE_POLYGONS.forEach(z => {
+    const zd = ZONE_DATA.find(d => d.value === z.value);
+    if (!zd || !z.rings || !z.rings.length) return;
+    let center;
+    try {
+      const ring = z.rings[0].map(p => [p[1], p[0]]);  // [lng,lat]
+      if (ring[0][0] !== ring[ring.length-1][0] || ring[0][1] !== ring[ring.length-1][1]) ring.push(ring[0]);
+      const poly = turf.polygon([ring]);
+      let c = turf.centerOfMass(poly);                       // 면적 기준 중심
+      if (!turf.booleanPointInPolygon(c, poly)) c = turf.pointOnFeature(poly);  // 오목하면 내부 보정
+      center = c.geometry.coordinates;  // [lng,lat]
+    } catch (e) { return; }
+    const off = ZONE_LABEL_OFFSET[z.value] || [0, 0];  // [위도Δ, 경도Δ]
+    const html = `<div style="transform:translate(-50%,-50%);font-size:15px;font-weight:800;color:#222;white-space:nowrap;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 4px #fff,0 0 6px #fff;">${zd.label}</div>`;
+    L.marker([center[1] + off[0], center[0] + off[1]], { icon: L.divIcon({ html, className: '', iconSize: [0, 0] }), pane: 'zoneLabelPane', interactive: false }).addTo(zoneLabelLayer);
+  });
+}
+
+// 줌에 따라 전환: 축소(< STATION_ZOOM)=권역 이름만 / 확대=지하철역 + 콘텐츠 마커
+function updateLayersByZoom() {
+  const detail = map.getZoom() >= STATION_ZOOM;
+  const set = (layer, want) => {
+    if (!layer) return;
+    if (want && !map.hasLayer(layer)) map.addLayer(layer);
+    else if (!want && map.hasLayer(layer)) map.removeLayer(layer);
+  };
+  // 권역 이름 라벨: 줌아웃 상태 + 권역 토글 ON
+  set(zoneLabelLayer, !detail && showZones);
+  // 지하철역: 줌인 상태 + 지하철 토글 ON
+  set(stationLayer, detail && showSubway);
+  // 콘텐츠 마커: 줌인 상태 (토글 영향 없음)
+  set(markersLayer, detail);
+}
+
+// 권역 폴리곤(채움) 표시/숨김 — 줌과 무관, 토글로만 제어
+function applyZoneVisibility() {
+  if (zoneLayer) {
+    if (showZones && !map.hasLayer(zoneLayer)) map.addLayer(zoneLayer);
+    else if (!showZones && map.hasLayer(zoneLayer)) map.removeLayer(zoneLayer);
+  }
+  updateLayersByZoom();  // 라벨도 토글 반영
+}
+
+/* ── 권역 pill 초기화 ────────────────────────────────────────── */
+function initZonePills() {
+  const container = document.getElementById('zone-overlay');
+  ZONE_DATA.forEach(z => {
+    const btn = document.createElement('button');
+    btn.className = 'zone-pill' + (z.value === 'all' ? ' active' : '');
+    btn.dataset.zone = z.value;
+    btn.textContent = z.label;
+    btn.addEventListener('click', () => activateZone(z.value));
+    container.appendChild(btn);
+  });
+}
+
+function filterAndRender(skipFit = false) {
+  let items = CONTENTS;
+  if (activeZone !== 'all') {
+    items = items.filter(i => i.zone === activeZone);
+  }
+  if (activeCat !== 'all') items = items.filter(i => i.category === activeCat);
+  // 기본 정렬: 최신순(날짜 내림차순, 동일하면 id 내림차순)
+  items = [...items].sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.id - a.id));
+  if (searchQuery) {
+    items = items
+      .map(i => ({ item: i, score: scoreMatch(i, searchQuery) }))
+      .filter(({ score }) => score > 0)
+      .sort((a, b) => b.score - a.score)
+      .map(({ item }) => item);
+  }
+  renderMarkers(items);
+  renderList(items);
+
+  if (!skipFit && items.length > 0) {
+    const bounds = L.latLngBounds(items.map(i => [i.lat, i.lng]));
+    map.fitBounds(bounds, { padding: [60, 60], maxZoom: 16, animate: true });
+  }
+}
+
+// 권역 활성화: 권역 중심으로 지도 이동
+function activateZone(zoneValue) {
+  activeZone = zoneValue;
+  // 권역 pill 시각 업데이트
+  document.querySelectorAll('.zone-pill').forEach(b => {
+    const z = ZONE_DATA.find(z => z.value === b.dataset.zone);
+    b.classList.remove('active');
+    b.style.background = '';
+    b.style.borderColor = '';
+    b.style.color = '';
+    if (b.dataset.zone === zoneValue) {
+      b.classList.add('active');
+      if (z?.color) {
+        b.style.background = z.color;
+        b.style.borderColor = z.color;
+        b.style.color = '#fff';
+      }
+    }
+  });
+  filterAndRender(true);
+  drawZonePolygons();
+  // 권역 폴리곤 bounds로 지도 이동
+  if (zoneValue === 'all') {
+    map.fitBounds([[37.50, 126.87], [37.60, 126.975]], { padding: [20, 20], animate: true });
+  } else {
+    const cached = voronoiZonesCache?.find(z => z.zone.value === zoneValue);
+    if (cached) {
+      const bounds = L.latLngBounds(cached.rings.flat());
+      map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15, animate: true });
+    }
+  }
+}
+
+/* ── 권역 폴리곤: 도로 중심선 기반 분할 ─────────────────────────
+   OSM 간선+주택가 도로망을 polygonize → 블록을 가장 가까운 권역 seed에
+   배정 → 병합. 도로가 없는 공원·강변 등 빈 영역은 Voronoi로 채워
+   빈틈없이 타일링. 결과는 localStorage에 캐시(첫 로드만 계산). */
+let voronoiZonesCache = null;  // 계산된 권역 폴리곤 캐시
+const ZONE_CACHE_KEY = 'dobomapo_zones_v5'; // (런타임 계산 fallback용, 현재 미사용)
+
+// 권역 폴리곤(정적, 사전계산). rings = [[lat,lng],...].
+// 성산·망원: 동쪽=월드컵로, 서쪽=증산로+공항대로 기준으로 절단. 서강대·대흥: 서강대역 포함. 나머지: 큰길(primary/secondary/tertiary) 자동 분할.
+const ZONE_POLYGONS = [{"value":"sangam","rings":[[[37.57183,126.85359],[37.57023,126.85489],[37.56303,126.86619],[37.55993,126.87329],[37.55425,126.88436],[37.55456,126.8845],[37.55846,126.88642],[37.56151,126.88817],[37.56247,126.88902],[37.56439,126.89063],[37.56489,126.89104],[37.56532,126.89141],[37.56665,126.89263],[37.56773,126.89356],[37.56698,126.89443],[37.56638,126.8961],[37.56631,126.89711],[37.56628,126.89914],[37.56544,126.90132],[37.56568,126.90226],[37.5669,126.90376],[37.56881,126.906],[37.56747,126.90968],[37.56563,126.91151],[37.56602,126.91291],[37.56655,126.91461],[37.56712,126.91571],[37.56783,126.91669],[37.56923,126.91374],[37.57123,126.90909],[37.58143,126.89409],[37.58473,126.88869],[37.59083,126.88209],[37.58953,126.88029],[37.58683,126.87909],[37.58623,126.87749],[37.58493,126.87719],[37.58443,126.87649],[37.58423,126.87659],[37.58403,126.87729],[37.58143,126.87659],[37.58063,126.87749],[37.57983,126.87769],[37.57893,126.87709],[37.57903,126.87629],[37.57823,126.87629],[37.57833,126.87389],[37.57753,126.86839],[37.57753,126.86489],[37.57523,126.85929],[37.57493,126.85929],[37.57383,126.85359],[37.57183,126.85359]]]},{"value":"mangwon","rings":[[[37.55423,126.88437],[37.55221,126.8883],[37.54952,126.89444],[37.55187,126.90349],[37.55374,126.91015],[37.55421,126.91175],[37.55493,126.91575],[37.55903,126.91253],[37.55942,126.91476],[37.56022,126.91632],[37.5656,126.91151],[37.56751,126.90964],[37.5688,126.906],[37.5672,126.90412],[37.56567,126.90225],[37.56544,126.90132],[37.56592,126.9001],[37.56628,126.89914],[37.56629,126.89701],[37.56639,126.8961],[37.56696,126.89444],[37.56772,126.89355],[37.56655,126.89257],[37.56542,126.89148],[37.56441,126.89065],[37.56245,126.88903],[37.5613,126.88803],[37.55977,126.88717],[37.55909,126.8868],[37.55843,126.88644],[37.55713,126.88577],[37.55445,126.88445],[37.55423,126.88437]]]},{"value":"hongdae","rings":[[[37.56563,126.91151],[37.5639,126.91307],[37.56021,126.91633],[37.5594,126.91472],[37.55902,126.91251],[37.55454,126.91609],[37.55278,126.91813],[37.55076,126.92044],[37.5507,126.92307],[37.55268,126.92402],[37.55235,126.92409],[37.55226,126.92411],[37.55212,126.92411],[37.55185,126.92411],[37.5513,126.92423],[37.55097,126.92426],[37.55061,126.9242],[37.55011,126.92412],[37.54981,126.92415],[37.5494,126.9242],[37.54892,126.92415],[37.54877,126.92459],[37.5485,126.92493],[37.54771,126.9258],[37.54766,126.92816],[37.54809,126.92797],[37.54841,126.92869],[37.55003,126.92838],[37.55147,126.93051],[37.55256,126.93206],[37.55265,126.93263],[37.55274,126.93318],[37.55395,126.93504],[37.55461,126.93605],[37.55495,126.93658],[37.55512,126.93681],[37.55521,126.93695],[37.55532,126.93676],[37.55642,126.93342],[37.55674,126.93259],[37.55688,126.93224],[37.55898,126.92655],[37.56118,126.92675],[37.56348,126.92825],[37.56478,126.92665],[37.56578,126.92465],[37.56728,126.91835],[37.56758,126.91709],[37.56783,126.91669],[37.56746,126.91617],[37.5671,126.91568],[37.56655,126.91461],[37.56638,126.91406],[37.56599,126.91282],[37.56563,126.91151]]]},{"value":"hapjeong","rings":[[[37.54951,126.89444],[37.548,126.8989],[37.5414,126.9048],[37.5414,126.9224],[37.5405,126.9231],[37.53993,126.92458],[37.54194,126.92585],[37.54373,126.92678],[37.54438,126.92701],[37.54469,126.92715],[37.54514,126.92736],[37.54572,126.92754],[37.54574,126.92676],[37.54619,126.92652],[37.54644,126.92635],[37.54667,126.92617],[37.54709,126.92604],[37.54758,126.92612],[37.5477,126.92603],[37.5477,126.9258],[37.54824,126.92522],[37.54852,126.92491],[37.54877,126.92458],[37.54891,126.92415],[37.54937,126.92421],[37.55004,126.92413],[37.55062,126.9242],[37.55097,126.92426],[37.55132,126.92422],[37.55184,126.92411],[37.55226,126.92411],[37.55268,126.92402],[37.5519,126.92363],[37.5507,126.92307],[37.55075,126.92125],[37.55075,126.92045],[37.55277,126.91812],[37.55385,126.91687],[37.55452,126.9161],[37.55493,126.91571],[37.5547,126.91434],[37.55419,126.91173],[37.55227,126.905],[37.54951,126.89444]]]},{"value":"seogangdae","rings":[[[37.5396,126.92543],[37.53922,126.92651],[37.53892,126.92726],[37.53939,126.92762],[37.53928,126.92793],[37.54022,126.92893],[37.5414,126.9303],[37.5405,126.9329],[37.53813,126.93777],[37.54034,126.94096],[37.54119,126.94179],[37.54447,126.94554],[37.54511,126.94605],[37.54521,126.9459],[37.54591,126.94644],[37.54648,126.94523],[37.54691,126.9455],[37.54857,126.94545],[37.55086,126.94657],[37.55145,126.94666],[37.55673,126.94648],[37.55676,126.94645],[37.5565,126.9414],[37.55521,126.93695],[37.55505,126.93672],[37.55336,126.93413],[37.55273,126.93318],[37.55256,126.93207],[37.55107,126.92993],[37.55003,126.92839],[37.54842,126.9287],[37.54809,126.92798],[37.54766,126.92817],[37.5477,126.92605],[37.54757,126.92612],[37.54712,126.92603],[37.54667,126.92617],[37.5462,126.92652],[37.54574,126.92677],[37.54571,126.92754],[37.54515,126.92737],[37.54439,126.92702],[37.54373,126.92679],[37.54179,126.92576],[37.53992,126.92457],[37.53962,126.92532],[37.5396,126.92543]]]},{"value":"gongdeok","rings":[[[37.5369,126.93995],[37.5338,126.9446],[37.535,126.9451],[37.535,126.9456],[37.5352,126.9454],[37.5357,126.9463],[37.5352,126.9474],[37.5358,126.9475],[37.5356,126.9488],[37.5363,126.9513],[37.5375,126.9534],[37.5389,126.9541],[37.5395,126.9557],[37.5416,126.957],[37.5423,126.9582],[37.5428,126.9584],[37.5432,126.9574],[37.5442,126.9576],[37.5444,126.9581],[37.5455,126.9579],[37.5461,126.9601],[37.5474,126.9611],[37.5481,126.9622],[37.5486,126.9622],[37.5488,126.9637],[37.5498,126.9639],[37.5515,126.9624],[37.554,126.9621],[37.5548,126.9617],[37.5569,126.9634],[37.5574,126.9631],[37.5582,126.9631],[37.5584,126.9616],[37.5591,126.9616],[37.5576,126.9603],[37.558,126.9604],[37.5575,126.9599],[37.5577,126.9596],[37.5572,126.9591],[37.5574,126.9562],[37.55673,126.94648],[37.55145,126.94666],[37.55086,126.94657],[37.54857,126.94545],[37.5468,126.94546],[37.54648,126.94523],[37.54592,126.94644],[37.54522,126.94588],[37.54512,126.94605],[37.54447,126.94554],[37.54119,126.94179],[37.54033,126.94094],[37.53816,126.93779],[37.5369,126.93995]]]}];
+
+// 마포구 경계 ring [lat,lng] (OSM relation 2419949, 단순화 88점)
+const MAPO_RING = [[37.54076,126.95658],[37.54071,126.95652],[37.54061,126.95664],[37.53947,126.95573],[37.53918,126.95519],[37.53893,126.9541],[37.53834,126.95365],[37.53751,126.95337],[37.53654,126.95155],[37.53629,126.95128],[37.5361,126.9506],[37.53605,126.94991],[37.53574,126.94899],[37.53558,126.94879],[37.53562,126.94785],[37.53582,126.94748],[37.53538,126.94738],[37.5353,126.94748],[37.53522,126.94738],[37.53537,126.94718],[37.53558,126.94652],[37.53574,126.94641],[37.53569,126.94627],[37.53518,126.94544],[37.53498,126.94556],[37.53497,126.9451],[37.53452,126.94482],[37.53423,126.94493],[37.53377,126.94458],[37.53423,126.94422],[37.53446,126.94386],[37.53445,126.94371],[37.53458,126.94367],[37.53784,126.93856],[37.54053,126.9329],[37.54136,126.93033],[37.53908,126.92766],[37.53913,126.92729],[37.53904,126.92711],[37.53975,126.92483],[37.54045,126.92309],[37.54063,126.92283],[37.54143,126.92242],[37.54142,126.90484],[37.5441,126.9022],[37.54502,126.90182],[37.54801,126.89894],[37.54939,126.89468],[37.55221,126.88826],[37.55309,126.88683],[37.5599,126.87329],[37.56198,126.869],[37.563,126.86624],[37.56438,126.86397],[37.5702,126.85488],[37.57179,126.85363],[37.5738,126.85363],[37.57492,126.85929],[37.57524,126.85929],[37.57747,126.86494],[37.57752,126.86838],[37.57801,126.8706],[37.57828,126.87392],[37.57818,126.87626],[37.57896,126.87626],[37.57887,126.87707],[37.57955,126.87761],[37.57977,126.87768],[37.58011,126.87742],[37.58031,126.87751],[37.58062,126.87747],[37.58126,126.87666],[37.58138,126.87663],[37.58163,126.87667],[37.58221,126.87705],[37.58289,126.8771],[37.58339,126.87699],[37.58405,126.87733],[37.58424,126.87716],[37.58416,126.87662],[37.58444,126.87654],[37.58494,126.87719],[37.58557,126.87727],[37.58625,126.87754],[37.58637,126.87847],[37.58677,126.87913],[37.58787,126.87944],[37.58951,126.88035],[37.59054,126.88199],[37.59064,126.88189],[37.59079,126.88206],[37.58718,126.88573],[37.58474,126.88869],[37.58141,126.89409],[37.57292,126.90671],[37.57192,126.90805],[37.5713,126.90909],[37.57123,126.90908],[37.57083,126.90981],[37.57064,126.91031],[37.57077,126.91025],[37.57024,126.91155],[37.56818,126.91589],[37.56716,126.91844],[37.56671,126.92012],[37.5665,126.92155],[37.56572,126.92473],[37.56515,126.92602],[37.56467,126.9267],[37.56338,126.92828],[37.56111,126.92677],[37.56083,126.92669],[37.55885,126.92659],[37.55691,126.93189],[37.55677,126.93186],[37.55674,126.93194],[37.55687,126.93199],[37.5551,126.93686],[37.55654,126.94137],[37.55741,126.95619],[37.55724,126.95913],[37.55766,126.95964],[37.55749,126.95979],[37.55751,126.95991],[37.55795,126.96045],[37.55761,126.96017],[37.55764,126.96026],[37.5587,126.96116],[37.55882,126.96116],[37.55908,126.96163],[37.55883,126.96174],[37.55862,126.96154],[37.55842,126.96156],[37.55845,126.96207],[37.55806,126.96281],[37.55822,126.9631],[37.55741,126.96305],[37.55732,126.96322],[37.55686,126.96343],[37.55603,126.96276],[37.55612,126.96262],[37.556,126.96274],[37.5559,126.96246],[37.55553,126.96213],[37.55514,126.96202],[37.55525,126.962],[37.555,126.96174],[37.55479,126.96173],[37.55402,126.96208],[37.55403,126.96201],[37.55278,126.96231],[37.55189,126.96229],[37.55155,126.96244],[37.55148,126.96236],[37.55066,126.96319],[37.55004,126.96355],[37.54994,126.96351],[37.54975,126.9639],[37.54925,126.9637],[37.54876,126.96374],[37.54864,126.96334],[37.54862,126.96224],[37.54813,126.96223],[37.54759,126.96171],[37.54742,126.96108],[37.54636,126.96013],[37.54607,126.96005],[37.54597,126.95953],[37.54605,126.95934],[37.54574,126.95897],[37.5455,126.95842],[37.54545,126.95791],[37.54514,126.95782],[37.54442,126.95811],[37.54422,126.95758],[37.54401,126.95746],[37.5437,126.95754],[37.54321,126.95742],[37.54297,126.95758],[37.54291,126.95809],[37.54276,126.95835],[37.54231,126.95818],[37.54164,126.95699],[37.54114,126.95685],[37.54076,126.95658]];
+
+// 권역 중심점(seed) 계산 (voronoiSeed 우선 적용)
+function computeZoneCentroids() {
+  return ZONE_DATA.filter(z => z.stations).map(z => {
+    if (z.voronoiSeed) return { zone: z, lat: z.voronoiSeed[0], lng: z.voronoiSeed[1] };
+    const stns = STATION_DATA.filter(s => z.stations.includes(s.value) && s.lat);
+    const lat = stns.reduce((s, p) => s + p.lat, 0) / stns.length;
+    const lng = stns.reduce((s, p) => s + p.lng, 0) / stns.length;
+    return { zone: z, lat, lng };
+  });
+}
+
+// 마포구 간선도로 fetch (큰길만 — primary/secondary/tertiary)
+async function fetchMapoRoads() {
+  const query = `[out:json][timeout:90];
+area(3602419949)->.mapo;
+way[highway~"^(primary|secondary|tertiary)$"](area.mapo);
+out geom;`;
+  const res = await fetch('https://overpass-api.de/api/interpreter', {
+    method: 'POST',
+    body: 'data=' + encodeURIComponent(query),
+  });
+  const data = await res.json();
+  return (data.elements || []).filter(e => e.geometry && e.geometry.length >= 2);
+}
+
+// 도로망 → 권역 폴리곤 계산 (polygonize → seed 배정 → 병합 + 빈영역 Voronoi)
+function computeRoadZones(roads) {
+  const T = turf;
+  const mapoLngLat = MAPO_RING.map(p => [p[1], p[0]]);
+  const a0 = mapoLngLat[0], aN = mapoLngLat[mapoLngLat.length - 1];
+  if (a0[0] !== aN[0] || a0[1] !== aN[1]) mapoLngLat.push(a0);
+  const district = T.polygon([mapoLngLat]);
+  const seeds = computeZoneCentroids();  // [{zone, lat, lng}]
+
+  // 도로를 2점 세그먼트로 분해(중복 제거) → polygonize 입력 노딩
+  const segs = [], seen = new Set();
+  const addLine = (coords) => {
+    for (let i = 0; i < coords.length - 1; i++) {
+      const a = coords[i], b = coords[i + 1];
+      if (a[0] === b[0] && a[1] === b[1]) continue;
+      const k = a[0] + ',' + a[1] + '|' + b[0] + ',' + b[1];
+      const k2 = b[0] + ',' + b[1] + '|' + a[0] + ',' + a[1];
+      if (seen.has(k) || seen.has(k2)) continue;
+      seen.add(k); segs.push(T.lineString([a, b]));
+    }
+  };
+  roads.forEach(e => addLine(e.geometry.map(pt => [pt.lon, pt.lat])));
+
+  const blocks = T.polygonize(T.featureCollection(segs));
+
+  // 블록을 가장 가까운 권역 seed에 배정
+  const byZone = {}; seeds.forEach(s => byZone[s.zone.value] = []);
+  blocks.features.forEach(f => {
+    let c; try { c = T.centroid(f).geometry.coordinates; } catch (e) { return; }
+    let best = null, bd = Infinity;
+    seeds.forEach(s => { const d = (c[0]-s.lng)**2 + (c[1]-s.lat)**2; if (d < bd) { bd = d; best = s.zone.value; } });
+    if (best) byZone[best].push(f);
+  });
+
+  // 도로 없는 빈 영역 = district − (모든 도로 블록 합집합)
+  const merged = T.dissolve(T.featureCollection(blocks.features.map(f => T.polygon(f.geometry.coordinates))));
+  let gap = district;
+  merged.features.forEach(f => { try { const d = T.difference(gap, f); if (d) gap = d; } catch (e) {} });
+  const gapPolys = !gap ? [] :
+    (gap.geometry.type === 'MultiPolygon' ? gap.geometry.coordinates.map(c => T.polygon(c)) : [T.polygon(gap.geometry.coordinates)]);
+
+  // 빈 영역 배정용 Voronoi 셀
+  const pts = T.featureCollection(seeds.map(s => T.point([s.lng, s.lat])));
+  const vor = T.voronoi(pts, { bbox: [126.84, 37.50, 126.99, 37.61] });
+  const vorCell = {};
+  seeds.forEach((s, i) => { let cell = vor.features[i]; try { cell = T.intersect(cell, district); } catch (e) {} vorCell[s.zone.value] = cell; });
+
+  // 권역별 병합 (도로 블록 + 빈영역 조각)
+  const out = [];
+  seeds.forEach(s => {
+    const v = s.zone.value;
+    const parts = [];
+    if (byZone[v].length) {
+      let dz; try { dz = T.dissolve(T.featureCollection(byZone[v].map(f => T.polygon(f.geometry.coordinates)))); }
+      catch (e) { dz = T.featureCollection(byZone[v]); }
+      dz.features.forEach(f => parts.push(f));
+    }
+    if (vorCell[v]) gapPolys.forEach(gp => { try { const it = T.intersect(gp, vorCell[v]); if (it) parts.push(it); } catch (e) {} });
+    if (!parts.length) return;
+    let u = parts[0];
+    for (let i = 1; i < parts.length; i++) { try { const uu = T.union(u, parts[i]); if (uu) u = uu; } catch (e) {} }
+    try { u = T.intersect(u, district) || u; } catch (e) {}
+    const rings = [];
+    const geoms = u.geometry.type === 'MultiPolygon' ? u.geometry.coordinates : [u.geometry.coordinates];
+    geoms.forEach(rgs => {
+      let oc = rgs[0];
+      let area = 0; try { area = T.area(T.polygon([oc])); } catch (e) {}
+      if (area < 3000) return;  // 슬리버 제거
+      try { oc = T.simplify(T.polygon([oc]), { tolerance: 0.00006, highQuality: true }).geometry.coordinates[0]; } catch (e) {}
+      if (oc.length >= 4) rings.push(oc.map(c => [+c[1].toFixed(5), +c[0].toFixed(5)]));
+    });
+    if (rings.length) out.push({ zone: s.zone, rings });
+  });
+  return out;
+}
+
+// 캐시된 폴리곤으로 그리기 (sync)
+function drawZonePolygons() {
+  if (zoneLayer) zoneLayer.remove();
+  zoneLayer = L.layerGroup().addTo(map);
+  if (!voronoiZonesCache?.length) return;
+
+  const isAll = activeZone === 'all';
+  voronoiZonesCache.forEach(({ zone, rings }) => {
+    const isActive = activeZone === zone.value;
+    // 선택된 권역은 fill 없이 테두리만 강조
+    const baseFillOpacity = isAll ? 0.08 : isActive ? 0.0  : 0.03;
+    const baseOpacity     = isAll ? 0.60 : isActive ? 1.0  : 0.25;
+    const baseWeight      = isActive ? 3   : 1.5;
+
+    rings.forEach(coords => {
+      const poly = L.polygon(coords, {
+        color:       zone.color,
+        weight:      baseWeight,
+        fillColor:   zone.color,
+        fillOpacity: baseFillOpacity,
+        opacity:     baseOpacity,
+        interactive: true,
+        className:   'zone-polygon',
+      }).addTo(zoneLayer);
+
+      // 권역 클릭 → 해당 권역 필터 자동 선택 + 영역으로 이동 (줌 무관)
+      poly.on('click', () => activateZone(zone.value));
+      poly.on('mouseover', () => {
+        if (activeZone !== zone.value) {
+          poly.setStyle({ fillOpacity: 0.18, weight: 2, opacity: 0.80 });
+          poly.getElement()?.style.setProperty('cursor', 'pointer');
+        }
+      });
+      poly.on('mouseout', () => {
+        poly.setStyle({ fillOpacity: baseFillOpacity, weight: baseWeight, opacity: baseOpacity });
+      });
+    });
+  });
+  // 권역 토글이 OFF면 다시 그려도 숨김 유지
+  if (!showZones && map.hasLayer(zoneLayer)) map.removeLayer(zoneLayer);
+}
+
+// 권역 폴리곤 렌더링 — 정적 사전계산 데이터(ZONE_POLYGONS) 사용 (런타임 fetch 없음)
+function renderZonePolygons() {
+  if (!voronoiZonesCache) {
+    voronoiZonesCache = ZONE_POLYGONS
+      .map(z => ({ zone: ZONE_DATA.find(zd => zd.value === z.value), rings: z.rings }))
+      .filter(z => z.zone && z.rings && z.rings.length);
+  }
+  drawZonePolygons();
+}
+
+/* ──────────────────────────────────────────────────────────
+   FILTER SELECTS
+   ────────────────────────────────────────────────────────── */
+// 카테고리 pill 필터
+
+document.querySelectorAll('.cat-pill').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.cat-pill').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    activeCat = btn.dataset.cat;
+    filterAndRender();
+  });
+});
+
+// 검색 input 이벤트는 initSearchSuggestions() 내부에서 처리
+
+/* ──────────────────────────────────────────────────────────
+   TAB SWITCHING (main)
+   ────────────────────────────────────────────────────────── */
+document.querySelectorAll('.tab-nav button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const tab = btn.dataset.tab;
+    document.querySelectorAll('.tab-nav button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('tab-' + tab).classList.add('active');
+
+    // resize map when switching back to map tab
+    if (tab === 'map') setTimeout(() => map.invalidateSize(), 100);
+  });
+});
+
+/* ──────────────────────────────────────────────────────────
+   CONTENTS SUB-NAV
+   ────────────────────────────────────────────────────────── */
+document.querySelectorAll('.contents-header button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const sec = btn.dataset.section;
+    document.querySelectorAll('.contents-header button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
+    document.getElementById('section-' + sec).classList.add('active');
+  });
+});
+
+/* ──────────────────────────────────────────────────────────
+   CONTACT FORM
+   ────────────────────────────────────────────────────────── */
+function handleSubmit(e) {
+  e.preventDefault();
+  alert('문의가 접수되었습니다. 빠른 시일 내에 답변 드리겠습니다. 😊');
+  e.target.reset();
+}
+
+/* ──────────────────────────────────────────────────────────
+   한국어 초성 검색
+   ────────────────────────────────────────────────────────── */
+const CHOSUNGS = ['ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ','ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
+
+function getChosung(str) {
+  return [...str].map(c => {
+    const code = c.charCodeAt(0) - 0xAC00;
+    if (code < 0 || code > 11171) return c;
+    return CHOSUNGS[Math.floor(code / 588)];
+  }).join('');
+}
+
+// 매칭 점수 반환 (0 = 불일치, 높을수록 앞에 위치)
+function scoreMatch(item, query) {
+  if (!query) return 0;
+  const title  = item.title;
+  const tLower = title.toLowerCase();
+  const qLower = query.toLowerCase();
+
+  // 1. 이름 직접 포함 → 앞에 있을수록 고점
+  const directIdx = tLower.indexOf(qLower);
+  if (directIdx >= 0) return 1000 - directIdx;
+
+  // 2. 초성 매칭 — 쿼리 전체가 자음일 때만 적용 (예: ㄷㄱ, ㅎㄷ)
+  if (/^[ㄱ-ㅎ]+$/.test(query)) {
+    const chIdx = getChosung(title).indexOf(query);
+    if (chIdx >= 0) return 500 - chIdx;
+  }
+
+  return 0;
+}
+
+// 하위 호환용 래퍼
+function matchName(item, query) { return scoreMatch(item, query) > 0; }
+
+/* ──────────────────────────────────────────────────────────
+   검색 추천 드롭다운
+   ────────────────────────────────────────────────────────── */
+function initSearchSuggestions() {
+  const input    = document.getElementById('search-input');
+  const dropdown = document.getElementById('search-suggestions');
+
+  function buildItemHTML(item) {
+    const lines = STATION_DATA.find(s => s.value === item.station)?.lines || [];
+    return `
+      <div class="suggest-item" data-id="${item.id}">
+        <div class="sug-info">
+          <div class="sug-name">${item.title}</div>
+          <div class="sug-meta">
+            ${lineBadgesHTML(lines)}
+            <span class="sug-station">${item.station}역</span>
+          </div>
+        </div>
+        <span style="font-size:11px;color:var(--brand-mid);font-weight:600">${catEmoji(item.category)} ${item.category}</span>
+      </div>`;
+  }
+
+  function render(items, header) {
+    if (!items.length) {
+      dropdown.innerHTML = `<div class="suggest-header">${header}</div><div class="suggest-empty">결과가 없어요</div>`;
+    } else {
+      dropdown.innerHTML = `<div class="suggest-header">${header}</div>` + items.map(buildItemHTML).join('');
+      dropdown.querySelectorAll('.suggest-item').forEach(el => {
+        el.addEventListener('mousedown', e => {
+          e.preventDefault();
+          const item = CONTENTS.find(c => c.id === +el.dataset.id);
+          if (!item) return;
+          input.value = item.title;
+          searchQuery = item.title;
+          dropdown.classList.remove('open');
+          filterAndRender();
+          setTimeout(() => flyTo(item.lat, item.lng, item.id), 300);
+        });
+      });
+    }
+    dropdown.classList.add('open');
+  }
+
+  const clearBtn  = document.getElementById('search-clear');
+  const searchIcon = document.getElementById('search-icon');
+
+  function updateClearBtn() {
+    const hasText = input.value.length > 0;
+    clearBtn.classList.toggle('visible', hasText);
+    searchIcon.style.display = hasText ? 'none' : '';
+  }
+
+  clearBtn.addEventListener('click', () => {
+    input.value = '';
+    searchQuery = '';
+    updateClearBtn();
+    dropdown.classList.remove('open');
+    filterAndRender();
+    input.focus();
+  });
+
+  input.addEventListener('focus', () => {
+    const q = input.value.trim();
+    if (!q) {
+      const recent = [...CONTENTS].slice(0, 5);
+      render(recent, '최근 콘텐츠');
+    }
+  });
+
+  input.addEventListener('input', e => {
+    const q = e.target.value.trim();
+    searchQuery = q;
+    updateClearBtn();
+    filterAndRender();
+    if (!q) {
+      const recent = [...CONTENTS].slice(0, 5);
+      render(recent, '최근 콘텐츠');
+    } else {
+      const matched = CONTENTS
+        .map(i => ({ item: i, score: scoreMatch(i, q) }))
+        .filter(({ score }) => score > 0)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 8)
+        .map(({ item }) => item);
+      render(matched, '검색 결과');
+    }
+  });
+
+  input.addEventListener('blur', () => {
+    setTimeout(() => dropdown.classList.remove('open'), 160);
+  });
+
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.search-wrap')) dropdown.classList.remove('open');
+  });
+}
+
+/* ──────────────────────────────────────────────────────────
+   INIT
+   ────────────────────────────────────────────────────────── */
+initMap();
+renderZonePolygons();
+renderStationMarkers();
+renderZoneLabels();
+updateLayersByZoom();
+initZonePills();
+initSearchSuggestions();
+initMapToggles();
+
+// 초기 뷰: 전체 권역이 화면에 들어오도록 fit (특히 모바일 좁은 화면 대응)
+(function fitToDistrict() {
+  try {
+    const pts = (voronoiZonesCache || []).flatMap(z => z.rings.flat());
+    if (pts.length) map.fitBounds(L.latLngBounds(pts), { padding: [16, 16], maxZoom: 13 });
+  } catch (e) {}
+  // 레이아웃 확정 후 지도 크기 재계산 (모바일 초기 렌더 누락 방지)
+  setTimeout(() => { map.invalidateSize(); updateLayersByZoom(); }, 150);
+})();
+
+// ── 지도 우측 토글 버튼: 권역 / 지하철 표시 전환 ──
+function initMapToggles() {
+  const btn = document.getElementById('layer-btn');
+  const panel = document.getElementById('layer-panel');
+  const zc = document.getElementById('lp-zone');
+  const sc = document.getElementById('lp-subway');
+  btn?.addEventListener('click', (e) => { e.stopPropagation(); panel?.classList.toggle('open'); });
+  document.addEventListener('click', (e) => { if (!e.target.closest('#map-toggles')) panel?.classList.remove('open'); });
+  zc?.addEventListener('change', () => { showZones = zc.checked; applyZoneVisibility(); });
+  sc?.addEventListener('change', () => { showSubway = sc.checked; updateLayersByZoom(); });
+}
+
+</script>
+</body>
+</html>
